@@ -23,7 +23,6 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['branch_id', 'serial_number']);
-            $table->index(['owner_type', 'owner_id']);
         });
 
         // MariaDB has no partial unique indexes. Emulate "one ACTIVE book per
