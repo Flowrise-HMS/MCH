@@ -1,0 +1,16 @@
+{
+    "name": "MCH",
+    "alias": "mch",
+    "description": "Maternal and child health: pregnancy registry, ANC/PNC and child-welfare visits, growth monitoring, immunizations, delivery, and client-held MCH records.",
+    "keywords": ["hms", "hospital", "mch", "anc", "cwc", "antenatal", "child-welfare", "growth", "fhir"],
+    "priority": 15,
+    "providers": [
+        "Modules\\MCH\\Providers\\MchServiceProvider"
+    ],
+    "files": [],
+    "requires": [
+        "Modules\\Core",
+        "Modules\\Patient",
+        "Modules\\Clinical"
+    ]
+}

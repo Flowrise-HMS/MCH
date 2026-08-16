@@ -1,0 +1,32 @@
+{
+    "name": "flowrise-hms/mch",
+    "description": "MCH module for Flowrise HMS: pregnancy registry, ANC/CWC visits, growth monitoring, immunizations, delivery, and MCH records.",
+    "type": "laravel-module",
+    "license": "MIT",
+    "require": {
+        "php": "^8.4",
+        "flowrise-hms/core": "dev-main",
+        "flowrise-hms/patient": "dev-main",
+        "flowrise-hms/clinical": "dev-main"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {}
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\MCH\\": "app/",
+            "Modules\\MCH\\Database\\Factories\\": "database/factories/",
+            "Modules\\MCH\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\MCH\\Tests\\": "tests/"
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
