@@ -12,8 +12,10 @@ use Modules\MCH\Models\MchRecord;
 class MchBookIssuanceService
 {
     /**
-     * Uniqueness of active books is enforced here via transaction and owner-row lock
-     * because the DB-level generated-column backstop is unavailable on MariaDB.
+     * Uniqueness of active books is enforced here via transaction + owner-row lock
+     * (without global scopes so BelongsToBranch cannot skip the lock). Serials are
+     * allocated under a branch-row lock because the DB generated-column unique
+     * index is unavailable on MariaDB (error 1901).
      */
     public function issue(
         Model $owner,
@@ -23,11 +25,17 @@ class MchBookIssuanceService
         ?User $issuedBy = null,
     ): MchRecord {
         return DB::transaction(function () use ($owner, $branch, $unit, $consent, $issuedBy): MchRecord {
-            $owner->newQuery()->whereKey($owner->getKey())->lockForUpdate()->first();
+            $owner->newQuery()
+                ->withoutGlobalScopes()
+                ->whereKey($owner->getKey())
+                ->lockForUpdate()
+                ->first();
 
             if ($this->activeBookExists($owner, $branch)) {
                 throw new \RuntimeException('An active MCH book already exists for this owner in this branch.');
             }
+
+            Branch::query()->whereKey($branch->id)->lockForUpdate()->first();
 
             return MchRecord::create([
                 'owner_type' => get_class($owner),
@@ -73,11 +81,17 @@ class MchBookIssuanceService
 
     private function nextSerialNumber(Branch $branch, string $unit): string
     {
-        $count = MchRecord::query()
+        $latestSerial = MchRecord::query()
+            ->withoutGlobalScopes()
             ->where('branch_id', $branch->id)
             ->where('unit', $unit)
-            ->count();
+            ->max('serial_number');
 
-        return sprintf('%s-%04d', strtoupper($unit), $count + 1);
+        $n = 1;
+        if (is_string($latestSerial)) {
+            $n = ((int) substr($latestSerial, strrpos($latestSerial, '-') + 1)) + 1;
+        }
+
+        return sprintf('%s-%04d', strtoupper($unit), $n);
     }
 }
