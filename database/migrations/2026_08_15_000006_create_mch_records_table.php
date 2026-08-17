@@ -4,6 +4,11 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * MariaDB 11.8 rejects CHAR column references in stored/indexed generated
+ * columns (error 1901). The plan's partial-unique emulation via active_owner_key
+ * is replaced by the application-level guard in MchBookIssuanceService.
+ */
 return new class extends Migration
 {
     public function up(): void
@@ -23,16 +28,6 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['branch_id', 'serial_number']);
-        });
-
-        // MariaDB has no partial unique indexes. Emulate "one ACTIVE book per
-        // owner per branch" with a stored generated column that is NULL for
-        // non-active rows (MySQL/MariaDB unique indexes allow multiple NULLs).
-        Schema::table('mch_records', function (Blueprint $table) {
-            $table->string('active_owner_key')->nullable()->storedAs(
-                "CASE WHEN status = 'active' THEN CONCAT(owner_type, ':', owner_id, ':', branch_id) ELSE NULL END",
-            );
-            $table->unique('active_owner_key');
         });
     }
 
