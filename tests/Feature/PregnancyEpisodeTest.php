@@ -3,7 +3,6 @@
 namespace Modules\MCH\Tests\Feature;
 
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Modules\Clinical\Models\Encounter;
 use Modules\Core\Models\Branch;
 use Modules\MCH\Enums\PregnancyOutcome;
 use Modules\MCH\Enums\PregnancyRiskFactor;

@@ -2,6 +2,7 @@
 
 namespace Modules\MCH\Tests\Feature;
 
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Modules\Core\Models\Branch;
 use Modules\MCH\Models\ChildHealthRecord;
@@ -41,7 +42,7 @@ class ChildHealthRecordTest extends TestCase
 
         ChildHealthRecord::create(['patient_id' => $child->id, 'branch_id' => $branch->id]);
 
-        $this->expectException(\Illuminate\Database\QueryException::class);
+        $this->expectException(QueryException::class);
         ChildHealthRecord::create(['patient_id' => $child->id, 'branch_id' => $branch->id]);
     }
 }

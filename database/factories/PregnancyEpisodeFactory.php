@@ -3,6 +3,7 @@
 namespace Modules\MCH\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Carbon;
 use Modules\Core\Models\Branch;
 use Modules\MCH\Enums\EddSource;
 use Modules\MCH\Enums\PregnancyOutcome;
@@ -27,7 +28,7 @@ class PregnancyEpisodeFactory extends Factory
             'risk_level' => RiskLevel::LOW,
             'risk_override' => false,
             'risk_factors' => [],
-            'booking_date' => \Illuminate\Support\Carbon::parse($lmp)->addWeek()->addDays(fake()->numberBetween(0, 7))->format('Y-m-d'),
+            'booking_date' => Carbon::parse($lmp)->addWeek()->addDays(fake()->numberBetween(0, 7))->format('Y-m-d'),
             'outcome' => PregnancyOutcome::ACTIVE,
         ];
     }
