@@ -4,10 +4,9 @@ namespace Modules\MCH\Tests\Feature;
 
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Modules\Core\Models\Branch;
+use Modules\MCH\Classes\Services\MchBookIssuanceService;
 use Modules\MCH\Enums\MchRecordStatus;
-use Modules\MCH\Models\MchRecord;
 use Modules\MCH\Models\PregnancyEpisode;
-use Modules\MCH\Services\MchBookIssuanceService;
 use Modules\Patient\Models\Patient;
 use Tests\TestCase;
 

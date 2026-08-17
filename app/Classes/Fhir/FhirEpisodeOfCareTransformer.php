@@ -4,6 +4,7 @@ namespace Modules\MCH\Classes\Fhir;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 use Modules\FHIR\Contracts\FhirResourceContract;
 use Modules\MCH\Enums\PregnancyOutcome;
 use Modules\MCH\Models\PregnancyEpisode;
@@ -39,7 +40,7 @@ class FhirEpisodeOfCareTransformer implements FhirResourceContract
             ],
             'diagnosis' => [
                 ['condition' => ['display' => 'Pregnancy'],
-                 'role' => ['coding' => [['code' => 'CC']]]],
+                    'role' => ['coding' => [['code' => 'CC']]]],
             ],
         ];
     }
@@ -48,7 +49,7 @@ class FhirEpisodeOfCareTransformer implements FhirResourceContract
     {
         return [
             'patient_id' => isset($fhirResource['patient']['reference'])
-                ? \Illuminate\Support\Str::afterLast($fhirResource['patient']['reference'], '/')
+                ? Str::afterLast($fhirResource['patient']['reference'], '/')
                 : null,
         ];
     }

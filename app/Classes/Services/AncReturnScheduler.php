@@ -1,7 +1,8 @@
 <?php
 
-namespace Modules\MCH\Services;
+namespace Modules\MCH\Classes\Services;
 
+use Illuminate\Support\Collection;
 use Modules\Core\Support\ModuleAvailability;
 use Modules\Core\Support\OptionalClass;
 use Modules\MCH\Models\MaternalVisitAssessment;
@@ -9,9 +10,9 @@ use Modules\MCH\Models\MaternalVisitAssessment;
 class AncReturnScheduler
 {
     /**
-     * @return \Illuminate\Support\Collection<int, mixed>|null
+     * @return Collection<int, mixed>|null
      */
-    public function schedule(MaternalVisitAssessment $assessment): ?\Illuminate\Support\Collection
+    public function schedule(MaternalVisitAssessment $assessment): ?Collection
     {
         if (! ModuleAvailability::appointmentEnabled() || $assessment->return_date === null) {
             return null;

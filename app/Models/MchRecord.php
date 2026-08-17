@@ -2,6 +2,7 @@
 
 namespace Modules\MCH\Models;
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -48,6 +49,6 @@ class MchRecord extends BaseModel
 
     public function consentingUser(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\User::class, 'consented_by');
+        return $this->belongsTo(User::class, 'consented_by');
     }
 }

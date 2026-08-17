@@ -1,6 +1,6 @@
 <?php
 
-namespace Modules\MCH\Services;
+namespace Modules\MCH\Classes\Services;
 
 use Modules\MCH\Enums\PregnancyRiskFactor;
 use Modules\MCH\Enums\RiskLevel;

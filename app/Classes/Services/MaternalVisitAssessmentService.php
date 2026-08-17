@@ -1,6 +1,6 @@
 <?php
 
-namespace Modules\MCH\Services;
+namespace Modules\MCH\Classes\Services;
 
 use Illuminate\Support\Facades\DB;
 use Modules\Clinical\Enums\EncounterType;

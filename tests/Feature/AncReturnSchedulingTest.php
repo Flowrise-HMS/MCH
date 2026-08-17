@@ -3,10 +3,12 @@
 namespace Modules\MCH\Tests\Feature;
 
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Modules\Appointment\Models\Appointment;
 use Modules\Clinical\Enums\EncounterType;
 use Modules\Clinical\Models\Encounter;
 use Modules\Core\Models\Branch;
-use Modules\MCH\Services\AncReturnScheduler;
+use Modules\MCH\Classes\Services\AncReturnScheduler;
+use Modules\MCH\Models\MaternalVisitAssessment;
 use Modules\Patient\Models\Patient;
 use Tests\TestCase;
 
@@ -33,7 +35,7 @@ class AncReturnSchedulingTest extends TestCase
             'type' => EncounterType::ANTENATAL,
         ]);
 
-        return \Modules\MCH\Models\MaternalVisitAssessment::create(array_merge([
+        return MaternalVisitAssessment::create(array_merge([
             'encounter_id' => $encounter->id,
             'patient_id' => $mother->id,
             'branch_id' => $this->branch->id,
@@ -53,7 +55,7 @@ class AncReturnSchedulingTest extends TestCase
             $instances->first()->start_at->toDateString(),
         );
 
-        $anchor = \Modules\Appointment\Models\Appointment::where('external_reference', 'anc-return:'.$assessment->id)->first();
+        $anchor = Appointment::where('external_reference', 'anc-return:'.$assessment->id)->first();
         $this->assertNotNull($anchor);
         $this->assertSame($assessment->return_date->toDateString(), $anchor->start_at->toDateString());
     }
@@ -69,11 +71,11 @@ class AncReturnSchedulingTest extends TestCase
         $this->assertEmpty($second);
         $this->assertSame(
             1,
-            \Modules\Appointment\Models\Appointment::where('external_reference', 'anc-return:'.$assessment->id)->count(),
+            Appointment::where('external_reference', 'anc-return:'.$assessment->id)->count(),
         );
         $this->assertSame(
             8,
-            \Modules\Appointment\Models\Appointment::where('external_reference', 'like', 'recur:%')->count(),
+            Appointment::where('external_reference', 'like', 'recur:%')->count(),
         );
     }
 

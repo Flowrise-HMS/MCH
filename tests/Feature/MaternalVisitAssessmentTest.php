@@ -6,11 +6,10 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Modules\Clinical\Enums\EncounterType;
 use Modules\Clinical\Models\Encounter;
 use Modules\Core\Models\Branch;
+use Modules\MCH\Classes\Services\MaternalVisitAssessmentService;
 use Modules\MCH\Enums\DangerSign;
 use Modules\MCH\Enums\GrowthMeasurementType;
 use Modules\MCH\Models\GrowthMeasurement;
-use Modules\MCH\Models\MaternalVisitAssessment;
-use Modules\MCH\Services\MaternalVisitAssessmentService;
 use Modules\Patient\Models\Patient;
 use Tests\TestCase;
 

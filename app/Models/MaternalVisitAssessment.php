@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Clinical\Models\Encounter;
 use Modules\Core\Models\BaseModel;
-use Modules\MCH\Enums\DangerSign;
 use Modules\MCH\Enums\Edema;
 use Modules\MCH\Enums\MaternalPresentation;
 use Modules\MCH\Enums\UrineResult;

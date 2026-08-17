@@ -8,11 +8,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Modules\Core\Models\BaseModel;
+use Modules\MCH\Classes\Services\PregnancyRiskService;
 use Modules\MCH\Enums\EddSource;
 use Modules\MCH\Enums\PregnancyOutcome;
 use Modules\MCH\Enums\PregnancyRiskFactor;
 use Modules\MCH\Enums\RiskLevel;
-use Modules\MCH\Services\PregnancyRiskService;
 use Modules\Patient\Models\Patient;
 
 class PregnancyEpisode extends BaseModel
