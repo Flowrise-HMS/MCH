@@ -16,12 +16,18 @@ use Modules\MCH\Models\GrowthMeasurement;
 use Modules\MCH\Models\MaternalVisitAssessment;
 use Modules\MCH\Models\MchRecord;
 use Modules\MCH\Models\PregnancyEpisode;
+use Modules\MCH\Models\Vaccine;
+use Modules\MCH\Models\ImmunizationRecord;
+use Modules\MCH\Models\ImmunizationSchedule;
 use Modules\MCH\Policies\ChildHealthRecordPolicy;
 use Modules\MCH\Policies\ChildVisitAssessmentPolicy;
 use Modules\MCH\Policies\GrowthMeasurementPolicy;
+use Modules\MCH\Policies\ImmunizationRecordPolicy;
+use Modules\MCH\Policies\ImmunizationSchedulePolicy;
 use Modules\MCH\Policies\MaternalVisitAssessmentPolicy;
 use Modules\MCH\Policies\MchRecordPolicy;
 use Modules\MCH\Policies\PregnancyEpisodePolicy;
+use Modules\MCH\Policies\VaccinePolicy;
 use Nwidart\Modules\Support\ModuleServiceProvider;
 
 class MchServiceProvider extends ModuleServiceProvider
@@ -51,6 +57,9 @@ class MchServiceProvider extends ModuleServiceProvider
         Gate::policy(MaternalVisitAssessment::class, MaternalVisitAssessmentPolicy::class);
         Gate::policy(ChildVisitAssessment::class, ChildVisitAssessmentPolicy::class);
         Gate::policy(MchRecord::class, MchRecordPolicy::class);
+        Gate::policy(Vaccine::class, VaccinePolicy::class);
+        Gate::policy(ImmunizationSchedule::class, ImmunizationSchedulePolicy::class);
+        Gate::policy(ImmunizationRecord::class, ImmunizationRecordPolicy::class);
     }
 
     protected function registerServices(): void
