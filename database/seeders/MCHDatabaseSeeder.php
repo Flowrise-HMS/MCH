@@ -11,6 +11,8 @@ class MCHDatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // $this->call([]);
+        $this->call([
+            MchImmunizationSeeder::class,
+        ]);
     }
 }
