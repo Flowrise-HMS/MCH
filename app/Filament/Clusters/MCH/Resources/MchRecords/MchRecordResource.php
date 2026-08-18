@@ -12,9 +12,13 @@ use Modules\MCH\Filament\Clusters\MCH\MchCluster;
 use Modules\MCH\Filament\Clusters\MCH\Resources\MchRecords\Pages\CreateMchRecord;
 use Modules\MCH\Filament\Clusters\MCH\Resources\MchRecords\Pages\EditMchRecord;
 use Modules\MCH\Filament\Clusters\MCH\Resources\MchRecords\Pages\ListMchRecords;
+use Modules\MCH\Filament\Clusters\MCH\Resources\MchRecords\Pages\ViewMchRecord;
 use Modules\MCH\Filament\Clusters\MCH\Resources\MchRecords\Schemas\MchRecordForm;
+use Modules\MCH\Filament\Clusters\MCH\Resources\MchRecords\Schemas\MchRecordInfolist;
 use Modules\MCH\Filament\Clusters\MCH\Resources\MchRecords\Tables\MchRecordsTable;
+use Modules\MCH\Models\ChildHealthRecord;
 use Modules\MCH\Models\MchRecord;
+use Modules\MCH\Models\PregnancyEpisode;
 
 class MchRecordResource extends Resource
 {
@@ -41,6 +45,11 @@ class MchRecordResource extends Resource
         return MchRecordForm::configure($schema);
     }
 
+    public static function infolist(Schema $schema): Schema
+    {
+        return MchRecordInfolist::configure($schema);
+    }
+
     public static function table(Table $table): Table
     {
         return MchRecordsTable::configure($table);
@@ -51,12 +60,21 @@ class MchRecordResource extends Resource
         return [
             'index' => ListMchRecords::route('/'),
             'create' => CreateMchRecord::route('/create'),
+            'view' => ViewMchRecord::route('/{record}'),
             'edit' => EditMchRecord::route('/{record}/edit'),
         ];
     }
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->with(['owner']);
+        return parent::getEloquentQuery()->with([
+            'branch',
+            'replacement',
+            'consentingUser',
+            'owner' => fn ($morphTo) => $morphTo->morphWith([
+                PregnancyEpisode::class => ['patient'],
+                ChildHealthRecord::class => ['patient'],
+            ]),
+        ]);
     }
 }

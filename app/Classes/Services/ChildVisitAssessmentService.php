@@ -20,10 +20,14 @@ class ChildVisitAssessmentService
             throw new \InvalidArgumentException('Child visit assessment requires a CHILD_WELFARE encounter.');
         }
 
+        if (isset($data['patient_id']) && $data['patient_id'] !== $encounter->patient_id) {
+            throw new \InvalidArgumentException('patient_id must match the encounter patient.');
+        }
+
         return DB::transaction(function () use ($encounter, $data): ChildVisitAssessment {
             $assessment = ChildVisitAssessment::create([
                 'encounter_id' => $encounter->id,
-                'patient_id' => $data['patient_id'] ?? $encounter->patient_id,
+                'patient_id' => $encounter->patient_id,
                 'branch_id' => $encounter->branch_id,
                 'child_health_record_id' => $data['child_health_record_id'] ?? null,
                 'feeding' => $data['feeding'] ?? null,

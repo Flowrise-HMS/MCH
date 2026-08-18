@@ -31,7 +31,7 @@ class GrowthMeasurementForm
                     Select::make('type')
                         ->options(GrowthMeasurementType::class)
                         ->required(),
-                    TextInput::make('value')->numeric()->required(),
+                    TextInput::make('value')->numeric()->required()->minValue(0),
                     TextInput::make('unit')->required()->maxLength(8)->default('kg'),
                     DatePicker::make('date')->required()->default(now()),
                 ]),

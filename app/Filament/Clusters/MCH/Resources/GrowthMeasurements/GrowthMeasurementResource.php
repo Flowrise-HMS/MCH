@@ -12,7 +12,9 @@ use Modules\MCH\Filament\Clusters\MCH\MchCluster;
 use Modules\MCH\Filament\Clusters\MCH\Resources\GrowthMeasurements\Pages\CreateGrowthMeasurement;
 use Modules\MCH\Filament\Clusters\MCH\Resources\GrowthMeasurements\Pages\EditGrowthMeasurement;
 use Modules\MCH\Filament\Clusters\MCH\Resources\GrowthMeasurements\Pages\ListGrowthMeasurements;
+use Modules\MCH\Filament\Clusters\MCH\Resources\GrowthMeasurements\Pages\ViewGrowthMeasurement;
 use Modules\MCH\Filament\Clusters\MCH\Resources\GrowthMeasurements\Schemas\GrowthMeasurementForm;
+use Modules\MCH\Filament\Clusters\MCH\Resources\GrowthMeasurements\Schemas\GrowthMeasurementInfolist;
 use Modules\MCH\Filament\Clusters\MCH\Resources\GrowthMeasurements\Tables\GrowthMeasurementsTable;
 use Modules\MCH\Models\GrowthMeasurement;
 
@@ -37,6 +39,11 @@ class GrowthMeasurementResource extends Resource
         return GrowthMeasurementForm::configure($schema);
     }
 
+    public static function infolist(Schema $schema): Schema
+    {
+        return GrowthMeasurementInfolist::configure($schema);
+    }
+
     public static function table(Table $table): Table
     {
         return GrowthMeasurementsTable::configure($table);
@@ -47,6 +54,7 @@ class GrowthMeasurementResource extends Resource
         return [
             'index' => ListGrowthMeasurements::route('/'),
             'create' => CreateGrowthMeasurement::route('/create'),
+            'view' => ViewGrowthMeasurement::route('/{record}'),
             'edit' => EditGrowthMeasurement::route('/{record}/edit'),
         ];
     }

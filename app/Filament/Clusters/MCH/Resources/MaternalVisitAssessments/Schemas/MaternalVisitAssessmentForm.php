@@ -5,6 +5,7 @@ namespace Modules\MCH\Filament\Clusters\MCH\Resources\MaternalVisitAssessments\S
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -48,19 +49,24 @@ class MaternalVisitAssessmentForm
                     TextInput::make('visit_number')->numeric()->minValue(1),
                     TextInput::make('ga_weeks')->numeric()->minValue(0)->label('GA weeks'),
                     TextInput::make('ga_days')->numeric()->minValue(0)->maxValue(6)->label('GA days'),
-                    TextInput::make('fetal_heart_rate')->numeric()->minValue(0),
+                    TextInput::make('fetal_heart_rate')->numeric()->minValue(60)->maxValue(220),
                     Select::make('presentation')->options(MaternalPresentation::class),
                     Select::make('edema')->options(Edema::class),
                     Select::make('urine_protein')->options(UrineResult::class),
                     Select::make('urine_glucose')->options(UrineResult::class),
                     TextInput::make('fundal_height')
                         ->numeric()
+                        ->minValue(0)
                         ->label('Fundal height (cm)')
                         ->dehydrated(),
                     DatePicker::make('return_date'),
                     CheckboxList::make('danger_signs')
                         ->options(DangerSign::class)
                         ->columns(2)
+                        ->columnSpanFull(),
+                    TagsInput::make('drugs_given')
+                        ->label('Drugs given')
+                        ->placeholder('Add drug')
                         ->columnSpanFull(),
                     Toggle::make('referral_required'),
                     TextInput::make('referral_destination')->maxLength(255),

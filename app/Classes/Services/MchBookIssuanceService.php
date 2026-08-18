@@ -24,32 +24,7 @@ class MchBookIssuanceService
         array $consent = [],
         ?User $issuedBy = null,
     ): MchRecord {
-        return DB::transaction(function () use ($owner, $branch, $unit, $consent, $issuedBy): MchRecord {
-            $owner->newQuery()
-                ->withoutGlobalScopes()
-                ->whereKey($owner->getKey())
-                ->lockForUpdate()
-                ->first();
-
-            if ($this->activeBookExists($owner, $branch)) {
-                throw new \RuntimeException('An active MCH book already exists for this owner in this branch.');
-            }
-
-            Branch::query()->whereKey($branch->id)->lockForUpdate()->first();
-
-            return MchRecord::create([
-                'owner_type' => get_class($owner),
-                'owner_id' => $owner->getKey(),
-                'branch_id' => $branch->id,
-                'serial_number' => $this->nextSerialNumber($branch, $unit),
-                'unit' => $unit,
-                'issue_date' => now()->toDateString(),
-                'status' => MchRecordStatus::ACTIVE,
-                'data_consented' => $consent['data_consented'] ?? false,
-                'consented_at' => ($consent['data_consented'] ?? false) ? now() : null,
-                'consented_by' => ($consent['data_consented'] ?? false) ? ($consent['consented_by'] ?? $issuedBy?->id) : null,
-            ]);
-        });
+        return DB::transaction(fn (): MchRecord => $this->issueBook($owner, $branch, $unit, $consent, $issuedBy));
     }
 
     public function replace(MchRecord $current, ?User $issuedBy = null): MchRecord
@@ -61,7 +36,12 @@ class MchBookIssuanceService
 
             $current->forceFill(['status' => MchRecordStatus::REPLACED])->save();
 
-            $replacement = $this->issue($current->owner, $current->branch, $current->unit, issuedBy: $issuedBy);
+            $replacement = $this->issueBook(
+                $current->owner,
+                $current->branch,
+                $current->unit,
+                issuedBy: $issuedBy,
+            );
 
             $current->forceFill(['replaced_by' => $replacement->id])->save();
 
@@ -79,6 +59,48 @@ class MchBookIssuanceService
             ->exists();
     }
 
+    /**
+     * @param  array<string, mixed>  $consent
+     */
+    private function issueBook(
+        Model $owner,
+        Branch $branch,
+        string $unit,
+        array $consent = [],
+        ?User $issuedBy = null,
+    ): MchRecord {
+        $unit = strtoupper(trim($unit));
+
+        if (! in_array($unit, config('mch.book_units', ['ANC', 'CWC']), true)) {
+            throw new \InvalidArgumentException("Invalid MCH book unit: {$unit}");
+        }
+
+        $owner->newQuery()
+            ->withoutGlobalScopes()
+            ->whereKey($owner->getKey())
+            ->lockForUpdate()
+            ->first();
+
+        if ($this->activeBookExists($owner, $branch)) {
+            throw new \RuntimeException('An active MCH book already exists for this owner in this branch.');
+        }
+
+        Branch::query()->whereKey($branch->id)->lockForUpdate()->first();
+
+        return MchRecord::create([
+            'owner_type' => get_class($owner),
+            'owner_id' => $owner->getKey(),
+            'branch_id' => $branch->id,
+            'serial_number' => $this->nextSerialNumber($branch, $unit),
+            'unit' => $unit,
+            'issue_date' => now()->toDateString(),
+            'status' => MchRecordStatus::ACTIVE,
+            'data_consented' => $consent['data_consented'] ?? false,
+            'consented_at' => ($consent['data_consented'] ?? false) ? now() : null,
+            'consented_by' => ($consent['data_consented'] ?? false) ? ($consent['consented_by'] ?? $issuedBy?->id) : null,
+        ]);
+    }
+
     private function nextSerialNumber(Branch $branch, string $unit): string
     {
         $latestSerial = MchRecord::query()
@@ -92,6 +114,6 @@ class MchBookIssuanceService
             $n = ((int) substr($latestSerial, strrpos($latestSerial, '-') + 1)) + 1;
         }
 
-        return sprintf('%s-%04d', strtoupper($unit), $n);
+        return sprintf('%s-%04d', $unit, $n);
     }
 }

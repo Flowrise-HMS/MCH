@@ -12,7 +12,9 @@ use Modules\MCH\Filament\Clusters\MCH\MchCluster;
 use Modules\MCH\Filament\Clusters\MCH\Resources\MaternalVisitAssessments\Pages\CreateMaternalVisitAssessment;
 use Modules\MCH\Filament\Clusters\MCH\Resources\MaternalVisitAssessments\Pages\EditMaternalVisitAssessment;
 use Modules\MCH\Filament\Clusters\MCH\Resources\MaternalVisitAssessments\Pages\ListMaternalVisitAssessments;
+use Modules\MCH\Filament\Clusters\MCH\Resources\MaternalVisitAssessments\Pages\ViewMaternalVisitAssessment;
 use Modules\MCH\Filament\Clusters\MCH\Resources\MaternalVisitAssessments\Schemas\MaternalVisitAssessmentForm;
+use Modules\MCH\Filament\Clusters\MCH\Resources\MaternalVisitAssessments\Schemas\MaternalVisitAssessmentInfolist;
 use Modules\MCH\Filament\Clusters\MCH\Resources\MaternalVisitAssessments\Tables\MaternalVisitAssessmentsTable;
 use Modules\MCH\Models\MaternalVisitAssessment;
 
@@ -41,6 +43,11 @@ class MaternalVisitAssessmentResource extends Resource
         return MaternalVisitAssessmentForm::configure($schema);
     }
 
+    public static function infolist(Schema $schema): Schema
+    {
+        return MaternalVisitAssessmentInfolist::configure($schema);
+    }
+
     public static function table(Table $table): Table
     {
         return MaternalVisitAssessmentsTable::configure($table);
@@ -51,6 +58,7 @@ class MaternalVisitAssessmentResource extends Resource
         return [
             'index' => ListMaternalVisitAssessments::route('/'),
             'create' => CreateMaternalVisitAssessment::route('/create'),
+            'view' => ViewMaternalVisitAssessment::route('/{record}'),
             'edit' => EditMaternalVisitAssessment::route('/{record}/edit'),
         ];
     }

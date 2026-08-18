@@ -6,15 +6,17 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Clinical\Models\Encounter;
+use Modules\Core\Concerns\ResolvesPatientClientIdentity;
+use Modules\Core\Contracts\ProvidesClientIdentity;
 use Modules\Core\Models\BaseModel;
 use Modules\MCH\Enums\Edema;
 use Modules\MCH\Enums\MaternalPresentation;
 use Modules\MCH\Enums\UrineResult;
 use Modules\Patient\Models\Patient;
 
-class MaternalVisitAssessment extends BaseModel
+class MaternalVisitAssessment extends BaseModel implements ProvidesClientIdentity
 {
-    use HasFactory, HasUuids;
+    use HasFactory, HasUuids, ResolvesPatientClientIdentity;
 
     protected $keyType = 'string';
 

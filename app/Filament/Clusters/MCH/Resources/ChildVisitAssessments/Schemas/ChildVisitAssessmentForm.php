@@ -63,7 +63,7 @@ class ChildVisitAssessmentForm
                                         ->all(),
                                 )
                                 ->required(),
-                            TextInput::make('value')->numeric()->required(),
+                            TextInput::make('value')->numeric()->required()->minValue(0),
                             TextInput::make('unit')->required()->maxLength(8)->default('kg'),
                         ])
                         ->columns(3)

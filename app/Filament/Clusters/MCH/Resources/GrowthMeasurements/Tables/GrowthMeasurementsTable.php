@@ -3,9 +3,11 @@
 namespace Modules\MCH\Filament\Clusters\MCH\Resources\GrowthMeasurements\Tables;
 
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Modules\Core\Filament\Support\ClientIdentityColumn;
 use Modules\MCH\Enums\GrowthMeasurementType;
 
 class GrowthMeasurementsTable
@@ -14,7 +16,7 @@ class GrowthMeasurementsTable
     {
         return $table
             ->columns([
-                TextColumn::make('patient.full_name')->label('Patient')->searchable(['patient.mrn']),
+                ClientIdentityColumn::make(label: 'Patient'),
                 TextColumn::make('type')->badge(),
                 TextColumn::make('value'),
                 TextColumn::make('unit'),
@@ -24,6 +26,7 @@ class GrowthMeasurementsTable
                 SelectFilter::make('type')->options(GrowthMeasurementType::class),
             ])
             ->recordActions([
+                ViewAction::make(),
                 EditAction::make(),
             ])
             ->defaultSort('date', 'desc');

@@ -3,9 +3,11 @@
 namespace Modules\MCH\Filament\Clusters\MCH\Resources\PregnancyEpisodes\Tables;
 
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Modules\Core\Filament\Support\ClientIdentityColumn;
 use Modules\MCH\Enums\PregnancyOutcome;
 use Modules\MCH\Enums\RiskLevel;
 
@@ -15,9 +17,7 @@ class PregnancyEpisodesTable
     {
         return $table
             ->columns([
-                TextColumn::make('patient.full_name')
-                    ->label('Mother')
-                    ->searchable(['patient.mrn']),
+                ClientIdentityColumn::make(label: 'Mother'),
                 TextColumn::make('gravida')->toggleable(),
                 TextColumn::make('parity')->toggleable(),
                 TextColumn::make('lmp')->date()->toggleable(),
@@ -32,6 +32,7 @@ class PregnancyEpisodesTable
                 SelectFilter::make('outcome')->options(PregnancyOutcome::class),
             ])
             ->recordActions([
+                ViewAction::make(),
                 EditAction::make(),
             ])
             ->defaultSort('created_at', 'desc');

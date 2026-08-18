@@ -26,10 +26,14 @@ class MaternalVisitAssessmentService
             $data['danger_signs'] ?? [],
         );
 
+        if (isset($data['patient_id']) && $data['patient_id'] !== $encounter->patient_id) {
+            throw new \InvalidArgumentException('patient_id must match the encounter patient.');
+        }
+
         return DB::transaction(function () use ($encounter, $data, $dangerSigns): MaternalVisitAssessment {
             $assessment = MaternalVisitAssessment::create([
                 'encounter_id' => $encounter->id,
-                'patient_id' => $data['patient_id'] ?? $encounter->patient_id,
+                'patient_id' => $encounter->patient_id,
                 'branch_id' => $encounter->branch_id,
                 'pregnancy_episode_id' => $data['pregnancy_episode_id'] ?? null,
                 'visit_number' => $data['visit_number'] ?? null,

@@ -12,7 +12,9 @@ use Modules\MCH\Filament\Clusters\MCH\MchCluster;
 use Modules\MCH\Filament\Clusters\MCH\Resources\PregnancyEpisodes\Pages\CreatePregnancyEpisode;
 use Modules\MCH\Filament\Clusters\MCH\Resources\PregnancyEpisodes\Pages\EditPregnancyEpisode;
 use Modules\MCH\Filament\Clusters\MCH\Resources\PregnancyEpisodes\Pages\ListPregnancyEpisodes;
+use Modules\MCH\Filament\Clusters\MCH\Resources\PregnancyEpisodes\Pages\ViewPregnancyEpisode;
 use Modules\MCH\Filament\Clusters\MCH\Resources\PregnancyEpisodes\Schemas\PregnancyEpisodeForm;
+use Modules\MCH\Filament\Clusters\MCH\Resources\PregnancyEpisodes\Schemas\PregnancyEpisodeInfolist;
 use Modules\MCH\Filament\Clusters\MCH\Resources\PregnancyEpisodes\Tables\PregnancyEpisodesTable;
 use Modules\MCH\Models\PregnancyEpisode;
 
@@ -41,6 +43,11 @@ class PregnancyEpisodeResource extends Resource
         return PregnancyEpisodeForm::configure($schema);
     }
 
+    public static function infolist(Schema $schema): Schema
+    {
+        return PregnancyEpisodeInfolist::configure($schema);
+    }
+
     public static function table(Table $table): Table
     {
         return PregnancyEpisodesTable::configure($table);
@@ -51,6 +58,7 @@ class PregnancyEpisodeResource extends Resource
         return [
             'index' => ListPregnancyEpisodes::route('/'),
             'create' => CreatePregnancyEpisode::route('/create'),
+            'view' => ViewPregnancyEpisode::route('/{record}'),
             'edit' => EditPregnancyEpisode::route('/{record}/edit'),
         ];
     }

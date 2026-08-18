@@ -1,8 +1,3 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use Modules\MCH\Http\Controllers\MCHController;
-
-Route::middleware(['auth', 'verified'])->group(function () {
-    Route::resource('mches', MCHController::class)->names('mch');
-});
+// Intentionally empty: MCH is administered via Filament. No authenticated web routes in MCH-1.

@@ -12,7 +12,9 @@ use Modules\MCH\Filament\Clusters\MCH\MchCluster;
 use Modules\MCH\Filament\Clusters\MCH\Resources\ChildVisitAssessments\Pages\CreateChildVisitAssessment;
 use Modules\MCH\Filament\Clusters\MCH\Resources\ChildVisitAssessments\Pages\EditChildVisitAssessment;
 use Modules\MCH\Filament\Clusters\MCH\Resources\ChildVisitAssessments\Pages\ListChildVisitAssessments;
+use Modules\MCH\Filament\Clusters\MCH\Resources\ChildVisitAssessments\Pages\ViewChildVisitAssessment;
 use Modules\MCH\Filament\Clusters\MCH\Resources\ChildVisitAssessments\Schemas\ChildVisitAssessmentForm;
+use Modules\MCH\Filament\Clusters\MCH\Resources\ChildVisitAssessments\Schemas\ChildVisitAssessmentInfolist;
 use Modules\MCH\Filament\Clusters\MCH\Resources\ChildVisitAssessments\Tables\ChildVisitAssessmentsTable;
 use Modules\MCH\Models\ChildVisitAssessment;
 
@@ -41,6 +43,11 @@ class ChildVisitAssessmentResource extends Resource
         return ChildVisitAssessmentForm::configure($schema);
     }
 
+    public static function infolist(Schema $schema): Schema
+    {
+        return ChildVisitAssessmentInfolist::configure($schema);
+    }
+
     public static function table(Table $table): Table
     {
         return ChildVisitAssessmentsTable::configure($table);
@@ -51,12 +58,13 @@ class ChildVisitAssessmentResource extends Resource
         return [
             'index' => ListChildVisitAssessments::route('/'),
             'create' => CreateChildVisitAssessment::route('/create'),
+            'view' => ViewChildVisitAssessment::route('/{record}'),
             'edit' => EditChildVisitAssessment::route('/{record}/edit'),
         ];
     }
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->with(['patient', 'encounter', 'childHealthRecord']);
+        return parent::getEloquentQuery()->with(['patient', 'encounter', 'childHealthRecord.patient']);
     }
 }

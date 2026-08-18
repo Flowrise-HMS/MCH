@@ -6,13 +6,15 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Clinical\Models\Encounter;
+use Modules\Core\Concerns\ResolvesPatientClientIdentity;
+use Modules\Core\Contracts\ProvidesClientIdentity;
 use Modules\Core\Models\BaseModel;
 use Modules\MCH\Enums\GrowthMeasurementType;
 use Modules\Patient\Models\Patient;
 
-class GrowthMeasurement extends BaseModel
+class GrowthMeasurement extends BaseModel implements ProvidesClientIdentity
 {
-    use HasFactory, HasUuids;
+    use HasFactory, HasUuids, ResolvesPatientClientIdentity;
 
     protected $keyType = 'string';
 

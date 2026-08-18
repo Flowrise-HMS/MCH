@@ -4,6 +4,7 @@ namespace Modules\MCH\Filament\Clusters\MCH\Resources\MchRecords\Tables;
 
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -33,6 +34,7 @@ class MchRecordsTable
                 SelectFilter::make('unit')->options(['ANC' => 'ANC', 'CWC' => 'CWC']),
             ])
             ->recordActions([
+                ViewAction::make(),
                 Action::make('replace')
                     ->label('Replace book')
                     ->icon('heroicon-m-arrow-path')

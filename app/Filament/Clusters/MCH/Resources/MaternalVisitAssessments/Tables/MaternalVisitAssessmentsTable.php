@@ -3,9 +3,12 @@
 namespace Modules\MCH\Filament\Clusters\MCH\Resources\MaternalVisitAssessments\Tables;
 
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
+use Modules\Core\Filament\Support\ClientIdentityColumn;
 
 class MaternalVisitAssessmentsTable
 {
@@ -13,7 +16,7 @@ class MaternalVisitAssessmentsTable
     {
         return $table
             ->columns([
-                TextColumn::make('patient.full_name')->label('Mother')->searchable(['patient.mrn']),
+                ClientIdentityColumn::make(label: 'Mother'),
                 TextColumn::make('visit_number')->label('Visit #')->sortable(),
                 TextColumn::make('ga_weeks')->label('GA'),
                 TextColumn::make('fetal_heart_rate')->label('FHR'),
@@ -22,7 +25,11 @@ class MaternalVisitAssessmentsTable
                 TextColumn::make('return_date')->date(),
                 TextColumn::make('created_at')->since()->toggleable(isToggledHiddenByDefault: true),
             ])
+            ->filters([
+                TernaryFilter::make('referral_required')->label('Referral'),
+            ])
             ->recordActions([
+                ViewAction::make(),
                 EditAction::make(),
             ])
             ->defaultSort('created_at', 'desc');
