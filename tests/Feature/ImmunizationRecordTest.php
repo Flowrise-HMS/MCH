@@ -4,6 +4,7 @@ namespace Modules\MCH\Tests\Feature;
 
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Modules\Core\Models\Branch;
+use Modules\MCH\Classes\Services\ImmunizationRecordService;
 use Modules\MCH\Enums\ImmunizationStatus;
 use Modules\MCH\Enums\VaccineAntigen;
 use Modules\MCH\Models\ImmunizationRecord;
@@ -118,7 +119,7 @@ class ImmunizationRecordTest extends TestCase
             'status' => ImmunizationStatus::SCHEDULED,
         ]);
 
-        $service = app(\Modules\MCH\Classes\Services\ImmunizationRecordService::class);
+        $service = app(ImmunizationRecordService::class);
         $updated = $service->administer($record, [
             'administered_date' => now()->toDateString(),
             'batch_lot' => 'LOT-001',
@@ -136,7 +137,7 @@ class ImmunizationRecordTest extends TestCase
         $child = Patient::factory()->child()->create(['branch_id' => $branch->id]);
         $vaccine = Vaccine::factory()->create();
 
-        $service = app(\Modules\MCH\Classes\Services\ImmunizationRecordService::class);
+        $service = app(ImmunizationRecordService::class);
 
         $declined = ImmunizationRecord::create([
             'patient_id' => $child->id,
@@ -169,7 +170,7 @@ class ImmunizationRecordTest extends TestCase
             'administered_date' => now()->toDateString(),
         ]);
 
-        $service = app(\Modules\MCH\Classes\Services\ImmunizationRecordService::class);
+        $service = app(ImmunizationRecordService::class);
 
         $this->expectException(\RuntimeException::class);
         $service->administer(

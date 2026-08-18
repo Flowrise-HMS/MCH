@@ -12,7 +12,7 @@ class VaccineFactory extends Factory
 
     public function definition(): array
     {
-        $antigen = $this->faker->unique()->randomElement(VaccineAntigen::cases());
+        $antigen = $this->faker->randomElement(VaccineAntigen::cases());
 
         return [
             'antigen' => $antigen,

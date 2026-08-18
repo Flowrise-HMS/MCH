@@ -4,6 +4,7 @@ namespace Modules\MCH\Tests\Feature;
 
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Modules\Core\Models\Branch;
+use Modules\MCH\Classes\Services\EpiDueService;
 use Modules\MCH\Enums\ImmunizationStatus;
 use Modules\MCH\Enums\VaccineAntigen;
 use Modules\MCH\Models\ImmunizationRecord;
@@ -62,7 +63,7 @@ class EpiDueServiceTest extends TestCase
             'date_of_birth' => now()->subDays(3),
         ]);
 
-        $service = app(\Modules\MCH\Classes\Services\EpiDueService::class);
+        $service = app(EpiDueService::class);
         $records = $service->generateDueRecords($child, $schedule, $branch->id);
 
         // BCG (minimum_age_days=0) should be due; OPV-1 (minimum_age_days=42) should NOT
@@ -80,7 +81,7 @@ class EpiDueServiceTest extends TestCase
             'date_of_birth' => now()->subDays(3),
         ]);
 
-        $service = app(\Modules\MCH\Classes\Services\EpiDueService::class);
+        $service = app(EpiDueService::class);
         $service->generateDueRecords($child, $schedule, $branch->id);
         $service->generateDueRecords($child, $schedule, $branch->id);
 
@@ -110,7 +111,7 @@ class EpiDueServiceTest extends TestCase
             'administered_date' => now()->subDay()->toDateString(),
         ]);
 
-        $service = app(\Modules\MCH\Classes\Services\EpiDueService::class);
+        $service = app(EpiDueService::class);
         $records = $service->generateDueRecords($child, $schedule, $branch->id);
 
         $this->assertCount(0, $records);
@@ -125,7 +126,7 @@ class EpiDueServiceTest extends TestCase
         $branch = Branch::factory()->create();
         $child = Patient::factory()->child()->create(['branch_id' => $branch->id]);
 
-        $service = app(\Modules\MCH\Classes\Services\EpiDueService::class);
+        $service = app(EpiDueService::class);
         $records = $service->generateDueRecords($child, $schedule, $branch->id);
 
         $this->assertCount(0, $records);

@@ -2,6 +2,7 @@
 
 namespace Modules\MCH\Tests\Feature;
 
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Modules\MCH\Enums\VaccineAntigen;
 use Modules\MCH\Models\Vaccine;
@@ -40,7 +41,7 @@ class VaccineCatalogueTest extends TestCase
             'name' => 'BCG',
         ]);
 
-        $this->expectException(\Illuminate\Database\QueryException::class);
+        $this->expectException(QueryException::class);
         Vaccine::create([
             'antigen' => VaccineAntigen::BCG,
             'name' => 'BCG duplicate',
