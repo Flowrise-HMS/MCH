@@ -52,4 +52,15 @@ class FhirEpisodeOfCareTransformerTest extends TestCase
 
         $this->assertSame('finished', $resource['status']);
     }
+
+    public function test_validate_business_rules_requires_status(): void
+    {
+        $transformer = app(FhirEpisodeOfCareTransformer::class);
+
+        $this->assertSame(
+            ['EpisodeOfCare.status is required'],
+            $transformer->validateBusinessRules(['resourceType' => 'EpisodeOfCare']),
+        );
+        $this->assertSame([], $transformer->validateBusinessRules(['status' => 'active']));
+    }
 }

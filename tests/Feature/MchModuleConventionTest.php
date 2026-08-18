@@ -98,6 +98,29 @@ class MchModuleConventionTest extends TestCase
         $this->assertFileExists(base_path('Modules/MCH/app/Classes/Services/MchBookIssuanceService.php'));
         $this->assertFileExists(base_path('Modules/MCH/app/Classes/Services/AncReturnScheduler.php'));
         $this->assertFileDoesNotExist(base_path('Modules/MCH/app/Services/PregnancyRiskService.php'));
+        $this->assertFileDoesNotExist(base_path('Modules/MCH/app/Http/Controllers/MCHController.php'));
+    }
+
+    public function test_filament_resources_define_infolists_and_view_pages(): void
+    {
+        $resources = [
+            PregnancyEpisodeResource::class,
+            ChildHealthRecordResource::class,
+            MaternalVisitAssessmentResource::class,
+            ChildVisitAssessmentResource::class,
+            GrowthMeasurementResource::class,
+            MchRecordResource::class,
+        ];
+
+        foreach ($resources as $resource) {
+            $this->assertTrue(
+                method_exists($resource, 'infolist'),
+                $resource.' must define an infolist() method',
+            );
+
+            $pages = $resource::getPages();
+            $this->assertArrayHasKey('view', $pages, $resource.' must register a view page');
+        }
     }
 
     public function test_policies_are_registered_and_enforced(): void

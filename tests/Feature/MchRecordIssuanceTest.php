@@ -90,4 +90,14 @@ class MchRecordIssuanceTest extends TestCase
         $this->assertTrue($book->data_consented);
         $this->assertNotNull($book->consented_at);
     }
+
+    public function test_rejects_invalid_book_unit(): void
+    {
+        $episode = $this->episode();
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid MCH book unit');
+
+        $this->service->issue($episode, $this->branch, 'INVALID');
+    }
 }

@@ -71,4 +71,53 @@ class MaternalVisitAssessmentTest extends TestCase
         $this->assertSame(GrowthMeasurementType::FUNDAL_HEIGHT, $measurement->type);
         $this->assertSame('26.000', $measurement->value);
     }
+
+    public function test_rejects_mismatched_patient_id(): void
+    {
+        $mother = Patient::factory()->female()->create(['branch_id' => $this->branch->id]);
+        $other = Patient::factory()->female()->create(['branch_id' => $this->branch->id]);
+        $encounter = Encounter::factory()->create([
+            'patient_id' => $mother->id,
+            'branch_id' => $this->branch->id,
+            'type' => EncounterType::ANTENATAL,
+        ]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('patient_id must match the encounter patient.');
+
+        app(MaternalVisitAssessmentService::class)->record($encounter, [
+            'patient_id' => $other->id,
+        ]);
+    }
+
+    public function test_rejects_non_antenatal_encounter(): void
+    {
+        $mother = Patient::factory()->female()->create(['branch_id' => $this->branch->id]);
+        $encounter = Encounter::factory()->create([
+            'patient_id' => $mother->id,
+            'branch_id' => $this->branch->id,
+            'type' => EncounterType::CHILD_WELFARE,
+        ]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Maternal visit assessment requires an ANTENATAL encounter.');
+
+        app(MaternalVisitAssessmentService::class)->record($encounter, []);
+    }
+
+    public function test_persists_drugs_given(): void
+    {
+        $mother = Patient::factory()->female()->create(['branch_id' => $this->branch->id]);
+        $encounter = Encounter::factory()->create([
+            'patient_id' => $mother->id,
+            'branch_id' => $this->branch->id,
+            'type' => EncounterType::ANTENATAL,
+        ]);
+
+        $assessment = app(MaternalVisitAssessmentService::class)->record($encounter, [
+            'drugs_given' => ['Iron', 'Folic acid'],
+        ]);
+
+        $this->assertSame(['Iron', 'Folic acid'], $assessment->drugs_given);
+    }
 }

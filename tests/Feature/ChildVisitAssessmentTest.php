@@ -53,4 +53,39 @@ class ChildVisitAssessmentTest extends TestCase
         $this->assertCount(1, $weights);
         $this->assertSame('8.200', $weights->first()->value);
     }
+
+    public function test_rejects_mismatched_patient_id(): void
+    {
+        $branch = Branch::factory()->create();
+        $child = Patient::factory()->child()->create(['branch_id' => $branch->id]);
+        $other = Patient::factory()->child()->create(['branch_id' => $branch->id]);
+        $encounter = Encounter::factory()->create([
+            'patient_id' => $child->id,
+            'branch_id' => $branch->id,
+            'type' => EncounterType::CHILD_WELFARE,
+        ]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('patient_id must match the encounter patient.');
+
+        app(ChildVisitAssessmentService::class)->record($encounter, [
+            'patient_id' => $other->id,
+        ]);
+    }
+
+    public function test_rejects_non_cwc_encounter(): void
+    {
+        $branch = Branch::factory()->create();
+        $child = Patient::factory()->child()->create(['branch_id' => $branch->id]);
+        $encounter = Encounter::factory()->create([
+            'patient_id' => $child->id,
+            'branch_id' => $branch->id,
+            'type' => EncounterType::ANTENATAL,
+        ]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Child visit assessment requires a CHILD_WELFARE encounter.');
+
+        app(ChildVisitAssessmentService::class)->record($encounter, []);
+    }
 }
