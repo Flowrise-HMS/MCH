@@ -103,4 +103,84 @@ class ImmunizationRecordTest extends TestCase
         $record = ImmunizationRecord::factory()->create();
         $this->assertInstanceOf(Patient::class, $record->patient);
     }
+
+    public function test_service_administers_scheduled_dose(): void
+    {
+        $branch = Branch::factory()->create();
+        $child = Patient::factory()->child()->create(['branch_id' => $branch->id]);
+        $vaccine = Vaccine::factory()->create();
+
+        $record = ImmunizationRecord::create([
+            'patient_id' => $child->id,
+            'branch_id' => $branch->id,
+            'vaccine_id' => $vaccine->id,
+            'dose_sequence' => 1,
+            'status' => ImmunizationStatus::SCHEDULED,
+        ]);
+
+        $service = app(\Modules\MCH\Classes\Services\ImmunizationRecordService::class);
+        $updated = $service->administer($record, [
+            'administered_date' => now()->toDateString(),
+            'batch_lot' => 'LOT-001',
+            'site' => 'left_upper_arm',
+            'route' => 'intramuscular',
+        ]);
+
+        $this->assertSame(ImmunizationStatus::ADMINISTERED, $updated->status);
+        $this->assertSame('LOT-001', $updated->batch_lot);
+    }
+
+    public function test_service_allows_declined_then_administered(): void
+    {
+        $branch = Branch::factory()->create();
+        $child = Patient::factory()->child()->create(['branch_id' => $branch->id]);
+        $vaccine = Vaccine::factory()->create();
+
+        $service = app(\Modules\MCH\Classes\Services\ImmunizationRecordService::class);
+
+        $declined = ImmunizationRecord::create([
+            'patient_id' => $child->id,
+            'branch_id' => $branch->id,
+            'vaccine_id' => $vaccine->id,
+            'dose_sequence' => 1,
+            'status' => ImmunizationStatus::DECLINED,
+            'reason' => 'Parental refusal',
+        ]);
+
+        $administered = $service->administer($declined, [
+            'administered_date' => now()->toDateString(),
+        ]);
+
+        $this->assertSame(ImmunizationStatus::ADMINISTERED, $administered->status);
+    }
+
+    public function test_service_prevents_duplicate_administered_dose(): void
+    {
+        $branch = Branch::factory()->create();
+        $child = Patient::factory()->child()->create(['branch_id' => $branch->id]);
+        $vaccine = Vaccine::factory()->create();
+
+        ImmunizationRecord::create([
+            'patient_id' => $child->id,
+            'branch_id' => $branch->id,
+            'vaccine_id' => $vaccine->id,
+            'dose_sequence' => 1,
+            'status' => ImmunizationStatus::ADMINISTERED,
+            'administered_date' => now()->toDateString(),
+        ]);
+
+        $service = app(\Modules\MCH\Classes\Services\ImmunizationRecordService::class);
+
+        $this->expectException(\RuntimeException::class);
+        $service->administer(
+            ImmunizationRecord::create([
+                'patient_id' => $child->id,
+                'branch_id' => $branch->id,
+                'vaccine_id' => $vaccine->id,
+                'dose_sequence' => 1,
+                'status' => ImmunizationStatus::SCHEDULED,
+            ]),
+            ['administered_date' => now()->toDateString()],
+        );
+    }
 }

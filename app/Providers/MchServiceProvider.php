@@ -5,6 +5,7 @@ namespace Modules\MCH\Providers;
 use Illuminate\Support\Facades\Gate;
 use Modules\MCH\Classes\Services\AncReturnScheduler;
 use Modules\MCH\Classes\Services\ChildVisitAssessmentService;
+use Modules\MCH\Classes\Services\ImmunizationRecordService;
 use Modules\MCH\Classes\Services\MaternalVisitAssessmentService;
 use Modules\MCH\Classes\Services\MchBookIssuanceService;
 use Modules\MCH\Classes\Services\PregnancyRiskService;
@@ -58,5 +59,6 @@ class MchServiceProvider extends ModuleServiceProvider
         $this->app->singleton(ChildVisitAssessmentService::class);
         $this->app->singleton(MchBookIssuanceService::class);
         $this->app->singleton(AncReturnScheduler::class);
+        $this->app->singleton(ImmunizationRecordService::class);
     }
 }
