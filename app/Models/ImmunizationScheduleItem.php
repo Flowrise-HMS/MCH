@@ -22,6 +22,12 @@ class ImmunizationScheduleItem extends BaseModel
         'label',
     ];
 
+    protected $casts = [
+        'dose_sequence' => 'integer',
+        'minimum_age_days' => 'integer',
+        'maximum_age_days' => 'integer',
+    ];
+
     protected static function bootBelongsToBranch(): void
     {
         // Schedule items are facility-wide catalogue rows — no branch_id.
