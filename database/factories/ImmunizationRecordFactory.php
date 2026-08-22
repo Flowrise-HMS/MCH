@@ -15,9 +15,13 @@ class ImmunizationRecordFactory extends Factory
 
     public function definition(): array
     {
+        $branch = Branch::factory()->create();
+
         return [
-            'patient_id' => Patient::factory()->child(),
-            'branch_id' => Branch::factory(),
+            'patient_id' => Patient::factory()->child()->state([
+                'branch_id' => $branch->id,
+            ]),
+            'branch_id' => $branch->id,
             'vaccine_id' => Vaccine::factory(),
             'dose_sequence' => 1,
             'status' => ImmunizationStatus::ADMINISTERED,

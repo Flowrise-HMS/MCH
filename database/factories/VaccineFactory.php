@@ -12,7 +12,16 @@ class VaccineFactory extends Factory
 
     public function definition(): array
     {
-        $antigen = $this->faker->randomElement(VaccineAntigen::cases());
+        $used = Vaccine::query()->pluck('antigen')->map(
+            fn ($antigen): string => $antigen instanceof VaccineAntigen ? $antigen->value : (string) $antigen
+        )->all();
+
+        $available = array_values(array_filter(
+            VaccineAntigen::cases(),
+            fn (VaccineAntigen $antigen): bool => ! in_array($antigen->value, $used, true),
+        ));
+
+        $antigen = $available[0] ?? $this->faker->unique()->randomElement(VaccineAntigen::cases());
 
         return [
             'antigen' => $antigen,

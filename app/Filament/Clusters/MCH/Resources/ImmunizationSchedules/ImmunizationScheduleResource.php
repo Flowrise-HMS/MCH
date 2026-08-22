@@ -65,6 +65,8 @@ class ImmunizationScheduleResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->withCount('items');
+        return parent::getEloquentQuery()
+            ->with(['items.vaccine'])
+            ->withCount('items');
     }
 }

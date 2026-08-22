@@ -15,19 +15,24 @@ use Modules\MCH\Enums\EddSource;
 use Modules\MCH\Enums\Edema;
 use Modules\MCH\Enums\FeedingMethod;
 use Modules\MCH\Enums\GrowthMeasurementType;
+use Modules\MCH\Enums\ImmunizationStatus;
 use Modules\MCH\Enums\MaternalPresentation;
 use Modules\MCH\Enums\MchRecordStatus;
 use Modules\MCH\Enums\PregnancyOutcome;
 use Modules\MCH\Enums\PregnancyRiskFactor;
 use Modules\MCH\Enums\RiskLevel;
 use Modules\MCH\Enums\UrineResult;
+use Modules\MCH\Enums\VaccineAntigen;
 use Modules\MCH\Filament\Clusters\MCH\MchCluster;
 use Modules\MCH\Filament\Clusters\MCH\Resources\ChildHealthRecords\ChildHealthRecordResource;
 use Modules\MCH\Filament\Clusters\MCH\Resources\ChildVisitAssessments\ChildVisitAssessmentResource;
 use Modules\MCH\Filament\Clusters\MCH\Resources\GrowthMeasurements\GrowthMeasurementResource;
+use Modules\MCH\Filament\Clusters\MCH\Resources\ImmunizationRecords\ImmunizationRecordResource;
+use Modules\MCH\Filament\Clusters\MCH\Resources\ImmunizationSchedules\ImmunizationScheduleResource;
 use Modules\MCH\Filament\Clusters\MCH\Resources\MaternalVisitAssessments\MaternalVisitAssessmentResource;
 use Modules\MCH\Filament\Clusters\MCH\Resources\MchRecords\MchRecordResource;
 use Modules\MCH\Filament\Clusters\MCH\Resources\PregnancyEpisodes\PregnancyEpisodeResource;
+use Modules\MCH\Filament\Clusters\MCH\Resources\Vaccines\VaccineResource;
 use Modules\MCH\Models\PregnancyEpisode;
 use Modules\MCH\Policies\PregnancyEpisodePolicy;
 use Spatie\Permission\Models\Permission;
@@ -57,6 +62,8 @@ class MchModuleConventionTest extends TestCase
             UrineResult::class,
             FeedingMethod::class,
             DevelopmentalScreen::class,
+            VaccineAntigen::class,
+            ImmunizationStatus::class,
         ];
     }
 
@@ -83,6 +90,9 @@ class MchModuleConventionTest extends TestCase
             ChildVisitAssessmentResource::class,
             GrowthMeasurementResource::class,
             MchRecordResource::class,
+            VaccineResource::class,
+            ImmunizationScheduleResource::class,
+            ImmunizationRecordResource::class,
         ];
 
         foreach ($resources as $resource) {
@@ -97,6 +107,10 @@ class MchModuleConventionTest extends TestCase
         $this->assertFileExists(base_path('Modules/MCH/app/Classes/Services/ChildVisitAssessmentService.php'));
         $this->assertFileExists(base_path('Modules/MCH/app/Classes/Services/MchBookIssuanceService.php'));
         $this->assertFileExists(base_path('Modules/MCH/app/Classes/Services/AncReturnScheduler.php'));
+        $this->assertFileExists(base_path('Modules/MCH/app/Classes/Services/ImmunizationRecordService.php'));
+        $this->assertFileExists(base_path('Modules/MCH/app/Classes/Services/EpiDueService.php'));
+        $this->assertFileExists(base_path('Modules/MCH/app/Classes/Services/EpiAppointmentScheduler.php'));
+        $this->assertFileExists(base_path('Modules/MCH/app/Classes/Services/MchWorkspaceService.php'));
         $this->assertFileDoesNotExist(base_path('Modules/MCH/app/Services/PregnancyRiskService.php'));
         $this->assertFileDoesNotExist(base_path('Modules/MCH/app/Http/Controllers/MCHController.php'));
     }
@@ -110,6 +124,9 @@ class MchModuleConventionTest extends TestCase
             ChildVisitAssessmentResource::class,
             GrowthMeasurementResource::class,
             MchRecordResource::class,
+            VaccineResource::class,
+            ImmunizationScheduleResource::class,
+            ImmunizationRecordResource::class,
         ];
 
         foreach ($resources as $resource) {

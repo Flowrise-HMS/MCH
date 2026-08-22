@@ -3,6 +3,7 @@
 namespace Modules\MCH\Filament\Clusters\MCH\Resources\MchRecords\Tables;
 
 use Filament\Actions\Action;
+use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Notifications\Notification;
@@ -46,6 +47,7 @@ class MchRecordsTable
                         Notification::make()->title('Replacement book issued')->success()->send();
                     }),
                 EditAction::make(),
+                DeleteAction::make(),
             ])
             ->defaultSort('created_at', 'desc');
     }

@@ -2,8 +2,15 @@
 
 namespace Modules\MCH\Tests\Feature;
 
+use App\Models\User;
+use Filament\Facades\Filament;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Gate;
+use Livewire\Livewire;
 use Modules\MCH\Enums\VaccineAntigen;
+use Modules\MCH\Filament\Clusters\MCH\Resources\ImmunizationSchedules\ImmunizationScheduleResource;
+use Modules\MCH\Filament\Clusters\MCH\Resources\ImmunizationSchedules\Pages\ViewImmunizationSchedule;
 use Modules\MCH\Models\ImmunizationSchedule;
 use Modules\MCH\Models\ImmunizationScheduleItem;
 use Modules\MCH\Models\Vaccine;
@@ -81,5 +88,27 @@ class ImmunizationScheduleTest extends TestCase
 
         $this->assertTrue($item->vaccine->is($vaccine));
         $this->assertTrue($item->schedule->is($schedule));
+    }
+
+    public function test_view_page_eager_loads_item_vaccines(): void
+    {
+        Gate::before(fn (): bool => true);
+        $this->actingAs(User::factory()->create());
+        Filament::setCurrentPanel(Filament::getDefaultPanel());
+
+        $schedule = ImmunizationSchedule::factory()->create();
+        ImmunizationScheduleItem::factory()->create([
+            'immunization_schedule_id' => $schedule->id,
+        ]);
+
+        $record = ImmunizationScheduleResource::getEloquentQuery()->findOrFail($schedule->id);
+
+        $this->assertTrue($record->relationLoaded('items'));
+        $this->assertTrue($record->items->first()->relationLoaded('vaccine'));
+
+        Model::preventLazyLoading();
+
+        Livewire::test(ViewImmunizationSchedule::class, ['record' => $schedule->getKey()])
+            ->assertOk();
     }
 }

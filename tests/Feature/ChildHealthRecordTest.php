@@ -2,8 +2,13 @@
 
 namespace Modules\MCH\Tests\Feature;
 
+use App\Models\User;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Gate;
+use Livewire\Livewire;
 use Modules\Core\Models\Branch;
+use Modules\MCH\Filament\Clusters\MCH\Resources\ChildHealthRecords\Pages\ListChildHealthRecords;
 use Modules\MCH\Models\ChildHealthRecord;
 use Modules\Patient\Models\Patient;
 use Tests\TestCase;
@@ -57,5 +62,41 @@ class ChildHealthRecordTest extends TestCase
 
         $this->assertNotSame($original->id, $replacement->id);
         $this->assertSame($child->id, $replacement->patient_id);
+    }
+
+    public function test_cwc_registry_search_finds_child_by_name(): void
+    {
+        Gate::before(fn (): bool => true);
+        $this->actingAs(User::factory()->create());
+        Filament::setCurrentPanel(Filament::getDefaultPanel());
+
+        $branch = Branch::factory()->create();
+        $match = Patient::factory()->child()->create([
+            'branch_id' => $branch->id,
+            'first_name' => 'Ama',
+            'last_name' => 'Mensah',
+        ]);
+        $other = Patient::factory()->child()->create([
+            'branch_id' => $branch->id,
+            'first_name' => 'Kwame',
+            'last_name' => 'Boateng',
+        ]);
+
+        $matchingRecord = ChildHealthRecord::create([
+            'patient_id' => $match->id,
+            'branch_id' => $branch->id,
+            'date_of_birth' => $match->date_of_birth->toDateString(),
+        ]);
+        $otherRecord = ChildHealthRecord::create([
+            'patient_id' => $other->id,
+            'branch_id' => $branch->id,
+            'date_of_birth' => $other->date_of_birth->toDateString(),
+        ]);
+
+        Livewire::test(ListChildHealthRecords::class)
+            ->searchTable('ama')
+            ->assertOk()
+            ->assertCanSeeTableRecords([$matchingRecord])
+            ->assertCanNotSeeTableRecords([$otherRecord]);
     }
 }

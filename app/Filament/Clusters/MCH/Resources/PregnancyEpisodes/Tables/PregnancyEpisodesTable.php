@@ -2,6 +2,7 @@
 
 namespace Modules\MCH\Filament\Clusters\MCH\Resources\PregnancyEpisodes\Tables;
 
+use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
@@ -34,6 +35,7 @@ class PregnancyEpisodesTable
             ->recordActions([
                 ViewAction::make(),
                 EditAction::make(),
+                DeleteAction::make(),
             ])
             ->defaultSort('created_at', 'desc');
     }

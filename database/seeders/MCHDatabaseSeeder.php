@@ -13,6 +13,8 @@ class MCHDatabaseSeeder extends Seeder
     {
         $this->call([
             MchImmunizationSeeder::class,
+            MchShieldPermissionsSeeder::class,
+            MchImmunizationDemoSeeder::class,
         ]);
     }
 }

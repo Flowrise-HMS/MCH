@@ -2,6 +2,7 @@
 
 namespace Modules\MCH\Filament\Clusters\MCH\Resources\Vaccines\Tables;
 
+use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\IconColumn;
@@ -24,6 +25,7 @@ class VaccinesTable
             ->recordActions([
                 ViewAction::make(),
                 EditAction::make(),
+                DeleteAction::make(),
             ])
             ->defaultSort('name');
     }

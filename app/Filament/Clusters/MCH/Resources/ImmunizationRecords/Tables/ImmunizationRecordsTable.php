@@ -2,6 +2,7 @@
 
 namespace Modules\MCH\Filament\Clusters\MCH\Resources\ImmunizationRecords\Tables;
 
+use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
@@ -13,18 +14,26 @@ use Modules\MCH\Models\Vaccine;
 
 class ImmunizationRecordsTable
 {
+    /**
+     * @return array<int, TextColumn>
+     */
+    public static function columns(bool $includePatient = true): array
+    {
+        return [
+            ...($includePatient ? [ClientIdentityColumn::make(label: 'Patient')] : []),
+            TextColumn::make('vaccine.name')->label('Vaccine')->searchable(),
+            TextColumn::make('dose_sequence')->label('Dose'),
+            TextColumn::make('status')->badge(),
+            TextColumn::make('administered_date')->date()->sortable(),
+            TextColumn::make('batch_lot')->searchable()->toggleable(),
+            TextColumn::make('recorded_by')->toggleable(isToggledHiddenByDefault: true),
+        ];
+    }
+
     public static function configure(Table $table): Table
     {
         return $table
-            ->columns([
-                ClientIdentityColumn::make(label: 'Patient'),
-                TextColumn::make('vaccine.name')->label('Vaccine')->searchable(),
-                TextColumn::make('dose_sequence')->label('Dose'),
-                TextColumn::make('status')->badge(),
-                TextColumn::make('administered_date')->date()->sortable(),
-                TextColumn::make('batch_lot')->searchable()->toggleable(),
-                TextColumn::make('recorded_by')->toggleable(isToggledHiddenByDefault: true),
-            ])
+            ->columns(self::columns())
             ->filters([
                 SelectFilter::make('status')->options(ImmunizationStatus::class),
                 SelectFilter::make('vaccine_id')
@@ -34,6 +43,7 @@ class ImmunizationRecordsTable
             ->recordActions([
                 ViewAction::make(),
                 EditAction::make(),
+                DeleteAction::make(),
             ])
             ->defaultSort('created_at', 'desc');
     }
