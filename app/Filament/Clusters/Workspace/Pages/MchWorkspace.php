@@ -6,12 +6,14 @@ use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Filament\Widgets\WidgetConfiguration;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Url;
 use Modules\Clinical\Enums\EncounterType;
 use Modules\Clinical\Models\Encounter;
 use Modules\Core\Models\Branch;
 use Modules\Core\Settings\FeatureSettings;
+use Modules\Core\Support\OptionalClass;
 use Modules\MCH\Classes\Services\AncReturnScheduler;
 use Modules\MCH\Classes\Services\ChildVisitAssessmentService;
 use Modules\MCH\Classes\Services\EpiDueService;
@@ -20,8 +22,6 @@ use Modules\MCH\Classes\Services\MaternalVisitAssessmentService;
 use Modules\MCH\Classes\Services\MchBookIssuanceService;
 use Modules\MCH\Classes\Services\MchWorkspaceService;
 use Modules\MCH\Enums\GrowthMeasurementType;
-use Modules\MCH\Enums\ImmunizationStatus;
-use Modules\Core\Support\OptionalClass;
 use Modules\MCH\Filament\Clusters\MCH\Pages\VaccinationCard;
 use Modules\MCH\Filament\Clusters\Workspace\MchWorkspaceCluster;
 use Modules\MCH\Filament\Widgets\PatientChildVisitsWidget;
@@ -571,7 +571,7 @@ class MchWorkspace extends Page
     }
 
     /**
-     * @return array<int, \Filament\Widgets\WidgetConfiguration|class-string>
+     * @return array<int, WidgetConfiguration|class-string>
      */
     protected function getFooterWidgets(): array
     {
