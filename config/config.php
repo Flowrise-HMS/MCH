@@ -14,4 +14,10 @@ return [
         'start_minute' => (int) env('MCH_ANC_RETURN_START_MINUTE', 0),
         'duration_minutes' => (int) env('MCH_ANC_RETURN_DURATION_MINUTES', 30),
     ],
+
+    'epi_appointments' => [
+        'start_hour' => (int) env('MCH_EPI_APPOINTMENT_START_HOUR', 9),
+        'start_minute' => (int) env('MCH_EPI_APPOINTMENT_START_MINUTE', 0),
+        'duration_minutes' => (int) env('MCH_EPI_APPOINTMENT_DURATION_MINUTES', 30),
+    ],
 ];

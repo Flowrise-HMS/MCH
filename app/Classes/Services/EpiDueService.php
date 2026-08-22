@@ -7,10 +7,15 @@ use Illuminate\Support\Collection;
 use Modules\MCH\Enums\ImmunizationStatus;
 use Modules\MCH\Models\ImmunizationRecord;
 use Modules\MCH\Models\ImmunizationSchedule;
+use Modules\MCH\Models\ImmunizationScheduleItem;
 use Modules\Patient\Models\Patient;
 
 class EpiDueService
 {
+    public function __construct(
+        private EpiAppointmentScheduler $appointmentScheduler,
+    ) {}
+
     /**
      * Generate SCHEDULED immunization records for a child based on a schedule.
      *
@@ -44,7 +49,7 @@ class EpiDueService
                 continue;
             }
 
-            $dueDate = $dob->copy()->addDays($item->minimum_age_days);
+            $dueDate = $this->dueDateFor($dob, $item);
 
             if ($dueDate->isAfter($now)) {
                 continue;
@@ -58,11 +63,58 @@ class EpiDueService
                 'status' => ImmunizationStatus::SCHEDULED,
             ]);
 
-            $records->push($record->setRelation('vaccine', $item->vaccine));
+            $record->setRelation('vaccine', $item->vaccine);
+            $this->appointmentScheduler->schedule($record);
+
+            $records->push($record);
             $existingKeys[] = $key;
         }
 
         return $records;
+    }
+
+    /**
+     * Classify a schedule item for a child relative to today.
+     *
+     * @return 'not_yet_due'|'due'|'overdue'|'complete'
+     */
+    public function classifyDose(
+        Patient $child,
+        ImmunizationScheduleItem $item,
+    ): string {
+        $existing = ImmunizationRecord::query()
+            ->where('patient_id', $child->id)
+            ->where('vaccine_id', $item->vaccine_id)
+            ->where('dose_sequence', $item->dose_sequence)
+            ->where('status', ImmunizationStatus::ADMINISTERED)
+            ->exists();
+
+        if ($existing) {
+            return 'complete';
+        }
+
+        $dob = $this->getDateOfBirth($child);
+        $dueDate = $this->dueDateFor($dob, $item);
+        $today = Carbon::today();
+
+        if ($dueDate->isAfter($today)) {
+            return 'not_yet_due';
+        }
+
+        if ($item->maximum_age_days !== null) {
+            $windowEnd = $dob->copy()->addDays((int) $item->maximum_age_days);
+
+            if ($today->gt($windowEnd)) {
+                return 'overdue';
+            }
+        }
+
+        return 'due';
+    }
+
+    private function dueDateFor(Carbon $dob, ImmunizationScheduleItem $item): Carbon
+    {
+        return $dob->copy()->addDays((int) $item->minimum_age_days);
     }
 
     private function getDateOfBirth(Patient $child): Carbon

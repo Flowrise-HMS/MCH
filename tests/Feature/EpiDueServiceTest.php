@@ -131,4 +131,31 @@ class EpiDueServiceTest extends TestCase
 
         $this->assertCount(0, $records);
     }
+
+    public function test_classifies_due_overdue_and_not_yet_due_doses(): void
+    {
+        $schedule = $this->setupSchedule();
+        $branch = Branch::factory()->create();
+        $child = Patient::factory()->child()->create([
+            'branch_id' => $branch->id,
+            'date_of_birth' => now()->subDays(50),
+        ]);
+
+        $bcgItem = $schedule->items()->whereHas('vaccine', fn ($query) => $query->where('antigen', VaccineAntigen::BCG))->firstOrFail();
+        $opvItem = $schedule->items()->whereHas('vaccine', fn ($query) => $query->where('antigen', VaccineAntigen::OPV))->firstOrFail();
+        $opvItem->forceFill(['maximum_age_days' => 45])->save();
+
+        $service = app(EpiDueService::class);
+
+        $this->assertSame('due', $service->classifyDose($child, $bcgItem));
+        $this->assertSame('overdue', $service->classifyDose($child, $opvItem));
+
+        $newborn = Patient::factory()->child()->create([
+            'branch_id' => $branch->id,
+            'date_of_birth' => now()->subDays(3),
+        ]);
+
+        $this->assertSame('due', $service->classifyDose($newborn, $bcgItem));
+        $this->assertSame('not_yet_due', $service->classifyDose($newborn, $opvItem));
+    }
 }
