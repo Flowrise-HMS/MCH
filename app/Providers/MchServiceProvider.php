@@ -5,10 +5,12 @@ namespace Modules\MCH\Providers;
 use Illuminate\Support\Facades\Gate;
 use Modules\MCH\Classes\Services\AncReturnScheduler;
 use Modules\MCH\Classes\Services\ChildVisitAssessmentService;
+use Modules\MCH\Classes\Services\EpiAppointmentScheduler;
 use Modules\MCH\Classes\Services\EpiDueService;
 use Modules\MCH\Classes\Services\ImmunizationRecordService;
 use Modules\MCH\Classes\Services\MaternalVisitAssessmentService;
 use Modules\MCH\Classes\Services\MchBookIssuanceService;
+use Modules\MCH\Classes\Services\MchWorkspaceService;
 use Modules\MCH\Classes\Services\PregnancyRiskService;
 use Modules\MCH\Models\ChildHealthRecord;
 use Modules\MCH\Models\ChildVisitAssessment;
@@ -71,5 +73,7 @@ class MchServiceProvider extends ModuleServiceProvider
         $this->app->singleton(AncReturnScheduler::class);
         $this->app->singleton(ImmunizationRecordService::class);
         $this->app->singleton(EpiDueService::class);
+        $this->app->singleton(EpiAppointmentScheduler::class);
+        $this->app->singleton(MchWorkspaceService::class);
     }
 }
