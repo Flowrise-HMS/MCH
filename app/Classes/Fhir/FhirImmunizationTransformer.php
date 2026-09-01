@@ -61,9 +61,14 @@ class FhirImmunizationTransformer implements FhirResourceContract
         return ImmunizationRecord::find($id);
     }
 
+    /**
+     * `toFhir()` reads `$record->vaccine->antigen` and `->name` without a
+     * relationLoaded() guard, so a bare query both N+1s and dereferences null on any
+     * record whose vaccine is missing.
+     */
     public function query(): Builder
     {
-        return ImmunizationRecord::query();
+        return ImmunizationRecord::query()->with(['vaccine']);
     }
 
     public function searchableParameters(): array
