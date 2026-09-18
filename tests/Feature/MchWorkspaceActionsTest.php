@@ -50,7 +50,7 @@ class MchWorkspaceActionsTest extends TestCase
         $this->migrateModules(['Core', 'Patient', 'Clinical', 'MCH']);
         $this->branch = Branch::factory()->create();
         Gate::before(fn (): bool => true);
-        $this->actingAs(User::factory()->create());
+        $this->actingAs(User::factory()->create(['branch_id' => $this->branch->id]));
         Filament::setCurrentPanel(Filament::getDefaultPanel());
     }
 

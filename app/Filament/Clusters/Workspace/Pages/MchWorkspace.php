@@ -500,7 +500,7 @@ class MchWorkspace extends Page
             return;
         }
 
-        $episode->update(['outcome' => PregnancyOutcome::from($outcome)]);
+        $episode->update(['outcome' => enum_from(PregnancyOutcome::class, $outcome)]);
 
         Notification::make()->title('Pregnancy outcome recorded')->success()->send();
         $this->selectPatient($this->currentPatient->id);
