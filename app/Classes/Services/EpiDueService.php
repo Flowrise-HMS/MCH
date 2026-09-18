@@ -17,46 +17,62 @@ class EpiDueService
     ) {}
 
     /**
-     * Generate SCHEDULED immunization records for a child based on a schedule.
+     * Generate SCHEDULED immunization records for a patient based on a schedule.
      *
-     * Only creates records for doses where the child has reached the minimum age
-     * and no existing record (of any status) covers that vaccine+dose.
+     * Child schedules anchor every dose on the date of birth. Maternal schedules
+     * anchor dose 1 on `$anchorDate` (the ANC booking date) and each later dose on
+     * the administered date of the previous dose, so a dose is only generated once
+     * the one before it has been given.
+     *
+     * Only creates records for doses that are due and have no existing record
+     * (of any status) for that vaccine+dose.
      *
      * @return Collection<int, ImmunizationRecord>
      */
     public function generateDueRecords(
-        Patient $child,
+        Patient $patient,
         ImmunizationSchedule $schedule,
         string $branchId,
+        ?Carbon $anchorDate = null,
     ): Collection {
-        $dob = $this->getDateOfBirth($child);
         $now = Carbon::now();
+        $childDob = $schedule->isMaternal() ? null : $this->getDateOfBirth($patient);
 
         $items = $schedule->items()->with('vaccine')->get();
 
-        $existingKeys = ImmunizationRecord::query()
-            ->where('patient_id', $child->id)
-            ->get(['vaccine_id', 'dose_sequence'])
-            ->map(fn (ImmunizationRecord $record): string => $record->vaccine_id.'|'.$record->dose_sequence)
+        $existing = ImmunizationRecord::query()
+            ->where('patient_id', $patient->id)
+            ->get(['vaccine_id', 'dose_sequence', 'status', 'administered_date']);
+
+        $existingKeys = $existing
+            ->map(fn (ImmunizationRecord $record): string => $this->doseKey($record->vaccine_id, $record->dose_sequence))
             ->all();
+
+        $administeredDates = $existing
+            ->filter(fn (ImmunizationRecord $record): bool => $record->status === ImmunizationStatus::ADMINISTERED && $record->administered_date !== null)
+            ->mapWithKeys(fn (ImmunizationRecord $record): array => [
+                $this->doseKey($record->vaccine_id, $record->dose_sequence) => $record->administered_date->copy()->startOfDay(),
+            ]);
 
         $records = collect();
 
         foreach ($items as $item) {
-            $key = $item->vaccine_id.'|'.$item->dose_sequence;
+            $key = $this->doseKey($item->vaccine_id, $item->dose_sequence);
 
             if (in_array($key, $existingKeys, true)) {
                 continue;
             }
 
-            $dueDate = $this->dueDateFor($dob, $item);
+            $anchor = $schedule->isMaternal()
+                ? $this->maternalAnchor($item, $administeredDates, $anchorDate)
+                : $childDob;
 
-            if ($dueDate->isAfter($now)) {
+            if ($anchor === null || $this->dueDateFor($anchor, $item)->isAfter($now)) {
                 continue;
             }
 
             $record = ImmunizationRecord::create([
-                'patient_id' => $child->id,
+                'patient_id' => $patient->id,
                 'branch_id' => $branchId,
                 'vaccine_id' => $item->vaccine_id,
                 'dose_sequence' => $item->dose_sequence,
@@ -74,7 +90,7 @@ class EpiDueService
     }
 
     /**
-     * Classify a schedule item for a child relative to today.
+     * Classify a child schedule item for a child relative to today.
      *
      * @return 'not_yet_due'|'due'|'overdue'|'complete'
      */
@@ -101,9 +117,9 @@ class EpiDueService
      *
      * @return 'not_yet_due'|'due'|'overdue'
      */
-    public function classifyScheduledDose(Carbon $dob, ImmunizationScheduleItem $item): string
+    public function classifyScheduledDose(Carbon $anchorDate, ImmunizationScheduleItem $item): string
     {
-        $dueDate = $this->dueDateFor($dob, $item);
+        $dueDate = $this->dueDateFor($anchorDate, $item);
         $today = Carbon::today();
 
         if ($dueDate->isAfter($today)) {
@@ -111,7 +127,7 @@ class EpiDueService
         }
 
         if ($item->maximum_age_days !== null) {
-            $windowEnd = $dob->copy()->addDays((int) $item->maximum_age_days);
+            $windowEnd = $anchorDate->copy()->addDays((int) $item->maximum_age_days);
 
             if ($today->gt($windowEnd)) {
                 return 'overdue';
@@ -121,9 +137,9 @@ class EpiDueService
         return 'due';
     }
 
-    private function dueDateFor(Carbon $dob, ImmunizationScheduleItem $item): Carbon
+    public function dueDateFor(Carbon $anchorDate, ImmunizationScheduleItem $item): Carbon
     {
-        return $dob->copy()->addDays((int) $item->minimum_age_days);
+        return $anchorDate->copy()->addDays((int) $item->minimum_age_days);
     }
 
     public function getDateOfBirth(Patient $child): Carbon
@@ -133,5 +149,25 @@ class EpiDueService
         }
 
         return Carbon::parse($child->date_of_birth)->startOfDay();
+    }
+
+    /**
+     * @param  Collection<string, Carbon>  $administeredDates
+     */
+    private function maternalAnchor(
+        ImmunizationScheduleItem $item,
+        Collection $administeredDates,
+        ?Carbon $anchorDate,
+    ): ?Carbon {
+        if ((int) $item->dose_sequence <= 1) {
+            return ($anchorDate ?? Carbon::today())->copy()->startOfDay();
+        }
+
+        return $administeredDates->get($this->doseKey($item->vaccine_id, (int) $item->dose_sequence - 1));
+    }
+
+    private function doseKey(string $vaccineId, int|string $doseSequence): string
+    {
+        return $vaccineId.'|'.$doseSequence;
     }
 }

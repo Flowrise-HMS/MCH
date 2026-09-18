@@ -116,6 +116,10 @@ All service classes live in `Modules/MCH/app/Classes/Services` (`Modules\MCH\Cla
 
 `PregnancyEpisode` still derives risk and booking GA in `saving` via `PregnancyRiskService` so Filament create/edit stay consistent without a dedicated pregnancy-create service. When `edd` is blank and `edd_source` is LMP, `saving` also derives EDD as LMP + 280 days.
 
+`EpiDueService::generateDueRecords()` anchors child doses on the date of birth and maternal TT doses on the previous administered dose (dose 1 on the ANC booking date passed as `$anchorDate`), so a maternal dose is only generated once the one before it has been given. The workspace "Record pregnancy outcome" action closes the active episode by setting `PregnancyEpisode.outcome`; delivery details remain MCH-4.
+
+`MchServiceProvider` resolves `pregnancyEpisodes`, `activePregnancyEpisode`, `childHealthRecord`, `immunizationRecords`, and `growthMeasurements` on `Patient` dynamically (the Clinical pattern) and registers three read-only relation managers on `PatientResource` through Core's `RelationManagersRegistry`.
+
 The MCH Workspace registers patients through `Modules\Patient\Classes\Services\PatientService::create()` and its own Filament schemas (`registerForm`, `ancVisitForm`, `cwcVisitForm`), which reuse `quickElements()` from the resource form classes. A child registered with a mother gets a `patient_relationships` row (`type = mother`, subject = child, object = mother).
 
 ## Filament UI

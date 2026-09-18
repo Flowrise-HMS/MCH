@@ -14,20 +14,28 @@ use Modules\MCH\Enums\RiskLevel;
 
 class PregnancyEpisodesTable
 {
+    /**
+     * @return array<int, TextColumn>
+     */
+    public static function columns(bool $includePatient = true): array
+    {
+        return [
+            ...($includePatient ? [ClientIdentityColumn::make(label: 'Mother')] : []),
+            TextColumn::make('gravida')->toggleable(),
+            TextColumn::make('parity')->toggleable(),
+            TextColumn::make('lmp')->date()->toggleable(),
+            TextColumn::make('edd')->date()->sortable(),
+            TextColumn::make('booking_ga_weeks')->label('Booking GA'),
+            TextColumn::make('risk_level')->badge(),
+            TextColumn::make('outcome')->badge(),
+            TextColumn::make('created_at')->dateTime()->since()->toggleable(isToggledHiddenByDefault: true),
+        ];
+    }
+
     public static function configure(Table $table): Table
     {
         return $table
-            ->columns([
-                ClientIdentityColumn::make(label: 'Mother'),
-                TextColumn::make('gravida')->toggleable(),
-                TextColumn::make('parity')->toggleable(),
-                TextColumn::make('lmp')->date()->toggleable(),
-                TextColumn::make('edd')->date()->sortable(),
-                TextColumn::make('booking_ga_weeks')->label('Booking GA'),
-                TextColumn::make('risk_level')->badge(),
-                TextColumn::make('outcome')->badge(),
-                TextColumn::make('created_at')->dateTime()->since()->toggleable(isToggledHiddenByDefault: true),
-            ])
+            ->columns(self::columns())
             ->filters([
                 SelectFilter::make('risk_level')->options(RiskLevel::class),
                 SelectFilter::make('outcome')->options(PregnancyOutcome::class),

@@ -307,6 +307,57 @@ class MchWorkspaceActionsTest extends TestCase
         $this->assertSame([GrowthMeasurementType::HEAD_CIRCUMFERENCE->value, GrowthMeasurementType::WEIGHT->value], $types);
     }
 
+    public function test_generate_epi_dues_for_mother_uses_maternal_schedule(): void
+    {
+        $mother = Patient::factory()->female()->create(['branch_id' => $this->branch->id]);
+        PregnancyEpisode::factory()->create([
+            'patient_id' => $mother->id,
+            'branch_id' => $this->branch->id,
+            'booking_date' => now()->subDays(10)->toDateString(),
+        ]);
+        $tt = Vaccine::create(['antigen' => VaccineAntigen::TETANUS_TOXOID, 'name' => 'TT']);
+        $schedule = ImmunizationSchedule::create([
+            'name' => 'Workspace Maternal TT',
+            'target_population' => ImmunizationSchedule::TARGET_MATERNAL,
+        ]);
+        ImmunizationScheduleItem::create([
+            'immunization_schedule_id' => $schedule->id,
+            'vaccine_id' => $tt->id,
+            'dose_sequence' => 1,
+            'minimum_age_days' => 0,
+        ]);
+
+        $component = Livewire::test(MchWorkspace::class)
+            ->call('selectPatient', $mother->id)
+            ->call('generateEpiDues');
+
+        $this->assertContains('immunizations', $component->instance()->availableTabs());
+        $this->assertDatabaseHas('immunization_records', [
+            'patient_id' => $mother->id,
+            'vaccine_id' => $tt->id,
+            'dose_sequence' => 1,
+            'status' => ImmunizationStatus::SCHEDULED->value,
+        ]);
+    }
+
+    public function test_record_outcome_closes_active_pregnancy(): void
+    {
+        $mother = Patient::factory()->female()->create(['branch_id' => $this->branch->id]);
+        $episode = PregnancyEpisode::factory()->create([
+            'patient_id' => $mother->id,
+            'branch_id' => $this->branch->id,
+        ]);
+
+        Livewire::test(MchWorkspace::class)
+            ->call('selectPatient', $mother->id)
+            ->assertSet('context.kind', 'mother')
+            ->callAction('recordOutcome', data: ['outcome' => PregnancyOutcome::DELIVERED->value])
+            ->assertHasNoActionErrors()
+            ->assertSet('context.kind', 'unknown');
+
+        $this->assertSame(PregnancyOutcome::DELIVERED, $episode->fresh()->outcome);
+    }
+
     public function test_issue_book_stores_chosen_consent(): void
     {
         $mother = Patient::factory()->female()->create(['branch_id' => $this->branch->id]);

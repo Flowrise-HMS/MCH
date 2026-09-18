@@ -3,6 +3,7 @@
 namespace Modules\MCH\Providers;
 
 use Illuminate\Support\Facades\Gate;
+use Modules\Core\Classes\Support\RelationManagersRegistry;
 use Modules\MCH\Classes\Services\AncReturnScheduler;
 use Modules\MCH\Classes\Services\ChildVisitAssessmentService;
 use Modules\MCH\Classes\Services\EpiAppointmentScheduler;
@@ -12,6 +13,10 @@ use Modules\MCH\Classes\Services\MaternalVisitAssessmentService;
 use Modules\MCH\Classes\Services\MchBookIssuanceService;
 use Modules\MCH\Classes\Services\MchWorkspaceService;
 use Modules\MCH\Classes\Services\PregnancyRiskService;
+use Modules\MCH\Enums\PregnancyOutcome;
+use Modules\MCH\Filament\RelationManagers\Patient\PatientGrowthMeasurementsRelationManager;
+use Modules\MCH\Filament\RelationManagers\Patient\PatientImmunizationRecordsRelationManager;
+use Modules\MCH\Filament\RelationManagers\Patient\PatientPregnancyEpisodesRelationManager;
 use Modules\MCH\Models\ChildHealthRecord;
 use Modules\MCH\Models\ChildVisitAssessment;
 use Modules\MCH\Models\GrowthMeasurement;
@@ -30,6 +35,7 @@ use Modules\MCH\Policies\MaternalVisitAssessmentPolicy;
 use Modules\MCH\Policies\MchRecordPolicy;
 use Modules\MCH\Policies\PregnancyEpisodePolicy;
 use Modules\MCH\Policies\VaccinePolicy;
+use Modules\Patient\Models\Patient;
 use Nwidart\Modules\Support\ModuleServiceProvider;
 
 class MchServiceProvider extends ModuleServiceProvider
@@ -49,6 +55,8 @@ class MchServiceProvider extends ModuleServiceProvider
 
         $this->registerPolicies();
         $this->registerServices();
+        $this->registerPatientRelations();
+        $this->registerPatientRelationManagers();
     }
 
     protected function registerPolicies(): void
@@ -75,5 +83,49 @@ class MchServiceProvider extends ModuleServiceProvider
         $this->app->singleton(EpiDueService::class);
         $this->app->singleton(EpiAppointmentScheduler::class);
         $this->app->singleton(MchWorkspaceService::class);
+    }
+
+    /**
+     * MCH-owned relations on Patient, resolved dynamically so Patient keeps no MCH imports
+     * (same pattern Clinical uses for encounters and vitals).
+     */
+    protected function registerPatientRelations(): void
+    {
+        Patient::resolveRelationUsing('pregnancyEpisodes', function (Patient $patient) {
+            return $patient->hasMany(PregnancyEpisode::class, 'patient_id', 'id');
+        });
+
+        Patient::resolveRelationUsing('activePregnancyEpisode', function (Patient $patient) {
+            return $patient->hasOne(PregnancyEpisode::class, 'patient_id', 'id')
+                ->where('outcome', PregnancyOutcome::ACTIVE)
+                ->orderByDesc('created_at');
+        });
+
+        Patient::resolveRelationUsing('childHealthRecord', function (Patient $patient) {
+            return $patient->hasOne(ChildHealthRecord::class, 'patient_id', 'id');
+        });
+
+        Patient::resolveRelationUsing('immunizationRecords', function (Patient $patient) {
+            return $patient->hasMany(ImmunizationRecord::class, 'patient_id', 'id');
+        });
+
+        Patient::resolveRelationUsing('growthMeasurements', function (Patient $patient) {
+            return $patient->hasMany(GrowthMeasurement::class, 'patient_id', 'id');
+        });
+    }
+
+    protected function registerPatientRelationManagers(): void
+    {
+        $patientResource = 'Modules\\Patient\\Filament\\Clusters\\Patient\\Resources\\Patients\\PatientResource';
+
+        if (! $this->app->bound(RelationManagersRegistry::class) || ! class_exists($patientResource)) {
+            return;
+        }
+
+        $this->app->make(RelationManagersRegistry::class)->register($patientResource, fn (): array => [
+            PatientPregnancyEpisodesRelationManager::class,
+            PatientImmunizationRecordsRelationManager::class,
+            PatientGrowthMeasurementsRelationManager::class,
+        ]);
     }
 }

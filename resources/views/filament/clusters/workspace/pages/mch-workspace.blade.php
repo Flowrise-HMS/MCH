@@ -51,9 +51,21 @@
                     <x-slot name="heading">ANC today ({{ $this->ancToday()->count() }})</x-slot>
                     <ul class="divide-y divide-gray-100 dark:divide-gray-800">
                         @forelse ($this->ancToday() as $patient)
+                            @php($pregnancy = $patient->activePregnancyEpisode)
                             <li>
                                 <button type="button" wire:click="selectPatient('{{ $patient->id }}')" class="w-full px-1 py-2 text-left hover:text-primary-600">
                                     {{ $patient->full_name }}
+                                    @if ($pregnancy)
+                                        <span class="block text-xs text-gray-500">
+                                            EDD {{ optional($pregnancy->edd)->toDateString() ?? '—' }}
+                                            @if ($ga = $this->gestationalAgeLabel($pregnancy))
+                                                · GA {{ $ga }}
+                                            @endif
+                                            @if ($pregnancy->risk_level === \Modules\MCH\Enums\RiskLevel::HIGH)
+                                                · <span class="text-danger-600">high risk</span>
+                                            @endif
+                                        </span>
+                                    @endif
                                 </button>
                             </li>
                         @empty
@@ -96,7 +108,23 @@
                 </x-filament::section>
             </div>
 
-            <div class="grid gap-4 lg:grid-cols-3">
+            <div class="grid gap-4 lg:grid-cols-4">
+                <x-filament::section>
+                    <x-slot name="heading">EDD within 14 days ({{ $this->eddDueSoon()->count() }})</x-slot>
+                    <ul class="divide-y divide-gray-100 dark:divide-gray-800">
+                        @forelse ($this->eddDueSoon() as $episode)
+                            <li>
+                                <button type="button" wire:click="selectPatient('{{ $episode->patient_id }}')" class="w-full px-1 py-2 text-left hover:text-primary-600">
+                                    {{ $episode->patient?->full_name ?? 'Patient' }}
+                                    <span class="block text-xs text-gray-500">EDD {{ optional($episode->edd)->toDateString() }}</span>
+                                </button>
+                            </li>
+                        @empty
+                            <li class="text-sm text-gray-500">No deliveries expected in the next two weeks.</li>
+                        @endforelse
+                    </ul>
+                </x-filament::section>
+
                 <x-filament::section>
                     <x-slot name="heading">High-risk pregnancies</x-slot>
                     <ul class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -209,6 +237,9 @@
                         </div>
                     @elseif ($context['kind'] === 'mother')
                         <p class="text-sm">Active pregnancy · risk {{ $context['pregnancy']?->risk_level?->getLabel() ?? '—' }}</p>
+                        <div class="mt-3">
+                            {{ $this->recordOutcomeAction }}
+                        </div>
                     @else
                         <p class="text-sm">CWC enrolled · generate EPI dues from the Immunizations tab when needed.</p>
                     @endif
@@ -230,7 +261,9 @@
                     </div>
                 @elseif ($activeTab === 'immunizations')
                     <div class="mb-4 flex flex-wrap gap-2">
-                        <x-filament::button wire:click="generateEpiDues">Generate dues</x-filament::button>
+                        <x-filament::button wire:click="generateEpiDues">
+                            {{ $context['kind'] === 'mother' ? 'Generate TT dues' : 'Generate dues' }}
+                        </x-filament::button>
                         <x-filament::input.wrapper>
                             <x-filament::input type="text" wire:model="administerBatchLot" placeholder="Batch/lot for administer" />
                         </x-filament::input.wrapper>

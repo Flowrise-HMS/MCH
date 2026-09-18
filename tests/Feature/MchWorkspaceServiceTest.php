@@ -10,6 +10,7 @@ use Modules\Clinical\Enums\EncounterType;
 use Modules\Core\Models\Branch;
 use Modules\MCH\Classes\Services\MchWorkspaceService;
 use Modules\MCH\Enums\ImmunizationStatus;
+use Modules\MCH\Enums\PregnancyOutcome;
 use Modules\MCH\Enums\PregnancyRiskFactor;
 use Modules\MCH\Enums\RiskLevel;
 use Modules\MCH\Enums\VaccineAntigen;
@@ -147,6 +148,49 @@ class MchWorkspaceServiceTest extends TestCase
         $rows = $this->service->highRiskPregnancies($this->branch->id);
 
         $this->assertTrue($rows->contains(fn ($episode): bool => $episode->patient_id === $mother->id));
+    }
+
+    public function test_anc_today_patients_carry_their_active_pregnancy(): void
+    {
+        $mother = Patient::factory()->female()->create(['branch_id' => $this->branch->id]);
+        $episode = PregnancyEpisode::factory()->create([
+            'patient_id' => $mother->id,
+            'branch_id' => $this->branch->id,
+        ]);
+        $this->service->ensureEncounter($mother, EncounterType::ANTENATAL);
+
+        $patient = $this->service->ancTodayPatients($this->branch->id)
+            ->first(fn (Patient $patient): bool => $patient->id === $mother->id);
+
+        $this->assertNotNull($patient);
+        $this->assertTrue($patient->relationLoaded('activePregnancyEpisode'));
+        $this->assertSame($episode->id, $patient->activePregnancyEpisode?->id);
+    }
+
+    public function test_edd_due_soon_lists_active_episodes_inside_the_window(): void
+    {
+        $soon = PregnancyEpisode::factory()->create([
+            'patient_id' => Patient::factory()->female()->create(['branch_id' => $this->branch->id])->id,
+            'branch_id' => $this->branch->id,
+            'edd' => now()->addDays(5)->toDateString(),
+        ]);
+        PregnancyEpisode::factory()->create([
+            'patient_id' => Patient::factory()->female()->create(['branch_id' => $this->branch->id])->id,
+            'branch_id' => $this->branch->id,
+            'edd' => now()->addDays(30)->toDateString(),
+        ]);
+        PregnancyEpisode::factory()->create([
+            'patient_id' => Patient::factory()->female()->create(['branch_id' => $this->branch->id])->id,
+            'branch_id' => $this->branch->id,
+            'edd' => now()->addDays(5)->toDateString(),
+            'outcome' => PregnancyOutcome::DELIVERED,
+        ]);
+
+        $rows = $this->service->eddDueSoon($this->branch->id);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame($soon->id, $rows->first()->id);
+        $this->assertTrue($rows->first()->relationLoaded('patient'));
     }
 
     public function test_find_open_encounter_returns_only_todays_open_encounter_of_type(): void

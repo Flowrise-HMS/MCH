@@ -11,6 +11,10 @@ class ImmunizationSchedule extends BaseModel
 {
     use HasFactory, HasUuids;
 
+    public const string TARGET_CHILD = 'child';
+
+    public const string TARGET_MATERNAL = 'maternal';
+
     protected $keyType = 'string';
 
     protected $attributes = [
@@ -31,6 +35,25 @@ class ImmunizationSchedule extends BaseModel
     protected static function bootBelongsToBranch(): void
     {
         // Schedules are facility-wide catalogues — no branch_id.
+    }
+
+    /**
+     * The active schedule for a population ('child' or 'maternal'), if one exists.
+     */
+    public static function activeFor(string $targetPopulation): ?self
+    {
+        return static::query()
+            ->where('is_active', true)
+            ->where('target_population', $targetPopulation)
+            ->first();
+    }
+
+    /**
+     * Maternal schedules space doses from the previous dose rather than from a date of birth.
+     */
+    public function isMaternal(): bool
+    {
+        return $this->target_population === self::TARGET_MATERNAL;
     }
 
     public function items(): HasMany

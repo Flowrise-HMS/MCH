@@ -405,17 +405,20 @@ class MchWorkspace extends Page
 
     public function generateEpiDues(): void
     {
-        if ($this->currentPatient === null || $this->context['kind'] !== 'child') {
+        if ($this->currentPatient === null || $this->context['kind'] === 'unknown') {
             return;
         }
 
-        $schedule = ImmunizationSchedule::query()
-            ->where('is_active', true)
-            ->where('target_population', 'child')
-            ->first();
+        $isMother = $this->context['kind'] === 'mother';
+        $schedule = ImmunizationSchedule::activeFor(
+            $isMother ? ImmunizationSchedule::TARGET_MATERNAL : ImmunizationSchedule::TARGET_CHILD,
+        );
 
         if ($schedule === null) {
-            Notification::make()->title('No active child EPI schedule')->warning()->send();
+            Notification::make()
+                ->title($isMother ? 'No active maternal TT schedule' : 'No active child EPI schedule')
+                ->warning()
+                ->send();
 
             return;
         }
@@ -424,6 +427,7 @@ class MchWorkspace extends Page
             $this->currentPatient,
             $schedule,
             $this->currentPatient->branch_id,
+            $isMother ? ($this->context['pregnancy']?->booking_date ?? Carbon::today()) : null,
         );
 
         Notification::make()
@@ -466,6 +470,40 @@ class MchWorkspace extends Page
         } catch (Throwable $e) {
             Notification::make()->title('Decline failed')->body($e->getMessage())->danger()->send();
         }
+    }
+
+    public function recordOutcomeAction(): Action
+    {
+        $options = collect(PregnancyOutcome::cases())
+            ->reject(fn (PregnancyOutcome $outcome): bool => $outcome === PregnancyOutcome::ACTIVE)
+            ->mapWithKeys(fn (PregnancyOutcome $outcome): array => [$outcome->value => $outcome->getLabel()])
+            ->all();
+
+        return Action::make('recordOutcome')
+            ->label('Record pregnancy outcome')
+            ->color('warning')
+            ->visible(fn (): bool => $this->context['kind'] === 'mother')
+            ->schema([
+                Select::make('outcome')
+                    ->options($options)
+                    ->required()
+                    ->helperText('Closes the active pregnancy episode. Delivery details are recorded separately.'),
+            ])
+            ->action(fn (array $data) => $this->recordOutcome((string) $data['outcome']));
+    }
+
+    public function recordOutcome(string $outcome): void
+    {
+        $episode = $this->context['pregnancy'] ?? null;
+
+        if ($this->currentPatient === null || ! $episode instanceof PregnancyEpisode) {
+            return;
+        }
+
+        $episode->update(['outcome' => PregnancyOutcome::from($outcome)]);
+
+        Notification::make()->title('Pregnancy outcome recorded')->success()->send();
+        $this->selectPatient($this->currentPatient->id);
     }
 
     public function issueBookAction(): Action
@@ -527,7 +565,7 @@ class MchWorkspace extends Page
     public function availableTabs(): array
     {
         return match ($this->context['kind']) {
-            'mother' => ['overview', 'encounter', 'anc-visit', 'vitals', 'books', 'history'],
+            'mother' => ['overview', 'encounter', 'anc-visit', 'immunizations', 'vitals', 'books', 'history'],
             'child' => ['overview', 'encounter', 'cwc-visit', 'immunizations', 'growth', 'vitals', 'books', 'history'],
             default => ['overview'],
         };
@@ -559,6 +597,23 @@ class MchWorkspace extends Page
         $branchId = $this->currentBranchId();
 
         return $branchId ? app(MchWorkspaceService::class)->highRiskPregnancies($branchId) : collect();
+    }
+
+    public function eddDueSoon()
+    {
+        $branchId = $this->currentBranchId();
+
+        return $branchId ? app(MchWorkspaceService::class)->eddDueSoon($branchId) : collect();
+    }
+
+    /**
+     * Short GA label ("32w 4d") for a board row's active pregnancy.
+     */
+    public function gestationalAgeLabel(?PregnancyEpisode $episode): ?string
+    {
+        $ga = $episode?->gestationalAgeAt(Carbon::today());
+
+        return $ga === null ? null : "{$ga['weeks']}w {$ga['days']}d";
     }
 
     public function booksToday()
@@ -623,13 +678,7 @@ class MchWorkspace extends Page
     {
         $pregnancy = $this->context['pregnancy'] ?? null;
 
-        if (! $pregnancy instanceof PregnancyEpisode) {
-            return null;
-        }
-
-        $ga = $pregnancy->gestationalAgeAt(Carbon::today());
-
-        return $ga === null ? null : "{$ga['weeks']}w {$ga['days']}d";
+        return $pregnancy instanceof PregnancyEpisode ? $this->gestationalAgeLabel($pregnancy) : null;
     }
 
     public function vaccinationCardUrl(): ?string

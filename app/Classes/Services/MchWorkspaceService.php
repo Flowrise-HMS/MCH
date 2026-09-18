@@ -132,19 +132,26 @@ class MchWorkspaceService
      */
     public function epiDuePatients(string $branchId): Collection
     {
-        $schedule = ImmunizationSchedule::query()
+        $schedules = ImmunizationSchedule::query()
             ->where('is_active', true)
-            ->where('target_population', 'child')
             ->with('items')
-            ->first();
+            ->get();
 
-        if ($schedule === null) {
+        if ($schedules->isEmpty()) {
             return collect();
         }
 
-        $itemsByKey = $schedule->items->keyBy(
-            fn (ImmunizationScheduleItem $item): string => $item->vaccine_id.'|'.$item->dose_sequence
-        );
+        /** @var array<string, array{item: ImmunizationScheduleItem, maternal: bool}> $itemsByKey */
+        $itemsByKey = [];
+
+        foreach ($schedules as $schedule) {
+            foreach ($schedule->items as $item) {
+                $itemsByKey[$item->vaccine_id.'|'.$item->dose_sequence] = [
+                    'item' => $item,
+                    'maternal' => $schedule->isMaternal(),
+                ];
+            }
+        }
 
         $records = ImmunizationRecord::query()
             ->with(['patient', 'vaccine'])
@@ -155,16 +162,19 @@ class MchWorkspaceService
         $grouped = [];
 
         foreach ($records as $record) {
-            $item = $itemsByKey->get($record->vaccine_id.'|'.$record->dose_sequence);
+            $entry = $itemsByKey[$record->vaccine_id.'|'.$record->dose_sequence] ?? null;
 
-            if ($item === null || $record->patient === null || $record->patient->date_of_birth === null) {
+            if ($entry === null || $record->patient === null || $record->patient->date_of_birth === null) {
                 continue;
             }
 
-            $classification = $this->epiDueService->classifyScheduledDose(
-                $this->epiDueService->getDateOfBirth($record->patient),
-                $item,
-            );
+            // Maternal doses are only generated once due, so a SCHEDULED row is due by construction.
+            $classification = $entry['maternal']
+                ? 'due'
+                : $this->epiDueService->classifyScheduledDose(
+                    $this->epiDueService->getDateOfBirth($record->patient),
+                    $entry['item'],
+                );
 
             if (! in_array($classification, ['due', 'overdue'], true)) {
                 continue;
@@ -201,6 +211,23 @@ class MchWorkspaceService
             ->where('outcome', PregnancyOutcome::ACTIVE)
             ->where('risk_level', RiskLevel::HIGH)
             ->latest('updated_at')
+            ->limit(25)
+            ->get();
+    }
+
+    /**
+     * Active pregnancies expected to deliver within the next `$days` days.
+     *
+     * @return Collection<int, PregnancyEpisode>
+     */
+    public function eddDueSoon(string $branchId, int $days = 14): Collection
+    {
+        return PregnancyEpisode::query()
+            ->with('patient')
+            ->where('branch_id', $branchId)
+            ->where('outcome', PregnancyOutcome::ACTIVE)
+            ->whereBetween('edd', [Carbon::today(), Carbon::today()->addDays($days)])
+            ->orderBy('edd')
             ->limit(25)
             ->get();
     }
@@ -284,6 +311,7 @@ class MchWorkspaceService
         }
 
         return Patient::query()
+            ->with('activePregnancyEpisode')
             ->where('branch_id', $branchId)
             ->whereIn('id', $patientIds)
             ->orderBy('last_name')

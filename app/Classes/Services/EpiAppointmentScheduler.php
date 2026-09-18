@@ -17,8 +17,9 @@ class EpiAppointmentScheduler
      * Book a single Appointment for a SCHEDULED immunization dose.
      *
      * Uses the Appointment module when enabled. Idempotency key:
-     * `epi-dose:{immunization_record_id}`. Overdue doses book for today;
-     * future doses book on DOB + schedule item minimum_age_days.
+     * `epi-dose:{immunization_record_id}`. Child doses book on DOB + schedule
+     * item minimum_age_days (today when overdue); maternal doses are generated
+     * only once due, so they book for today.
      */
     public function schedule(ImmunizationRecord $record): mixed
     {
@@ -30,7 +31,7 @@ class EpiAppointmentScheduler
             return null;
         }
 
-        $item = $this->matchingChildScheduleItem($record);
+        $item = $this->matchingScheduleItem($record);
 
         if ($item === null) {
             return null;
@@ -89,15 +90,13 @@ class EpiAppointmentScheduler
         });
     }
 
-    private function matchingChildScheduleItem(ImmunizationRecord $record): ?ImmunizationScheduleItem
+    private function matchingScheduleItem(ImmunizationRecord $record): ?ImmunizationScheduleItem
     {
         return ImmunizationScheduleItem::query()
+            ->with('schedule')
             ->where('vaccine_id', $record->vaccine_id)
             ->where('dose_sequence', $record->dose_sequence)
-            ->whereHas('schedule', function ($query): void {
-                $query->where('is_active', true)
-                    ->where('target_population', 'child');
-            })
+            ->whereHas('schedule', fn ($query) => $query->where('is_active', true))
             ->first();
     }
 
@@ -107,12 +106,17 @@ class EpiAppointmentScheduler
         int $startHour,
         int $startMinute,
     ): Carbon {
+        $today = Carbon::today();
+
+        if ($item->schedule?->isMaternal()) {
+            return $today->setTime($startHour, $startMinute);
+        }
+
         $dob = $patient->date_of_birth instanceof Carbon
             ? $patient->date_of_birth->copy()->startOfDay()
             : Carbon::parse($patient->date_of_birth)->startOfDay();
 
         $dueDate = $dob->copy()->addDays((int) $item->minimum_age_days);
-        $today = Carbon::today();
 
         if ($dueDate->lt($today)) {
             $dueDate = $today->copy();

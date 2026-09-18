@@ -160,6 +160,48 @@ class EpiDueServiceTest extends TestCase
         $this->assertSame('not_yet_due', $service->classifyDose($newborn, $opvItem));
     }
 
+    public function test_maternal_schedule_generates_next_tt_dose_from_previous_dose(): void
+    {
+        $branch = Branch::factory()->create();
+        $tt = Vaccine::create(['antigen' => VaccineAntigen::TETANUS_TOXOID, 'name' => 'TT']);
+        $schedule = ImmunizationSchedule::create([
+            'name' => 'Maternal TT',
+            'target_population' => ImmunizationSchedule::TARGET_MATERNAL,
+        ]);
+
+        foreach ([1 => 0, 2 => 28, 3 => 182] as $dose => $minDays) {
+            ImmunizationScheduleItem::create([
+                'immunization_schedule_id' => $schedule->id,
+                'vaccine_id' => $tt->id,
+                'dose_sequence' => $dose,
+                'minimum_age_days' => $minDays,
+            ]);
+        }
+
+        $mother = Patient::factory()->female()->create(['branch_id' => $branch->id]);
+        $booking = now()->subDays(40)->startOfDay();
+        $service = app(EpiDueService::class);
+
+        $first = $service->generateDueRecords($mother, $schedule, $branch->id, $booking);
+
+        $this->assertCount(1, $first);
+        $this->assertSame(1, $first->first()->dose_sequence);
+
+        $service->generateDueRecords($mother, $schedule, $branch->id, $booking);
+        $this->assertSame(1, ImmunizationRecord::query()->where('patient_id', $mother->id)->count());
+
+        $first->first()->forceFill([
+            'status' => ImmunizationStatus::ADMINISTERED,
+            'administered_date' => now()->subDays(30)->toDateString(),
+        ])->save();
+
+        $second = $service->generateDueRecords($mother, $schedule, $branch->id, $booking);
+
+        $this->assertCount(1, $second);
+        $this->assertSame(2, $second->first()->dose_sequence);
+        $this->assertSame(0, ImmunizationRecord::query()->where('patient_id', $mother->id)->where('dose_sequence', 3)->count());
+    }
+
     public function test_classify_scheduled_dose_matches_classify_dose_without_querying(): void
     {
         $schedule = $this->setupSchedule();

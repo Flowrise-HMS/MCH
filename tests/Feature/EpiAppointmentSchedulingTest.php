@@ -140,6 +140,34 @@ class EpiAppointmentSchedulingTest extends TestCase
         $this->assertNull(app(EpiAppointmentScheduler::class)->schedule($record));
     }
 
+    public function test_books_maternal_tt_dose_for_today(): void
+    {
+        $tt = Vaccine::create(['antigen' => VaccineAntigen::TETANUS_TOXOID, 'name' => 'TT']);
+        $maternal = ImmunizationSchedule::create([
+            'name' => 'Maternal TT Test',
+            'target_population' => ImmunizationSchedule::TARGET_MATERNAL,
+        ]);
+        ImmunizationScheduleItem::create([
+            'immunization_schedule_id' => $maternal->id,
+            'vaccine_id' => $tt->id,
+            'dose_sequence' => 2,
+            'minimum_age_days' => 28,
+        ]);
+        $mother = Patient::factory()->female()->create(['branch_id' => $this->branch->id]);
+        $record = ImmunizationRecord::create([
+            'patient_id' => $mother->id,
+            'branch_id' => $this->branch->id,
+            'vaccine_id' => $tt->id,
+            'dose_sequence' => 2,
+            'status' => ImmunizationStatus::SCHEDULED,
+        ]);
+
+        $appointment = app(EpiAppointmentScheduler::class)->schedule($record);
+
+        $this->assertNotNull($appointment);
+        $this->assertTrue(Carbon::parse($appointment->start_at)->isToday());
+    }
+
     public function test_returns_null_when_no_active_child_schedule_item_matches(): void
     {
         $child = $this->child(35);

@@ -92,10 +92,7 @@ class VaccinationCard extends Page
             ->sortByDesc(fn (ImmunizationRecord $record): int => $record->status === ImmunizationStatus::ADMINISTERED ? 1 : 0)
             ->keyBy(fn (ImmunizationRecord $record): string => $record->vaccine_id.'|'.$record->dose_sequence);
 
-        $items = ImmunizationSchedule::query()
-            ->where('is_active', true)
-            ->where('target_population', 'child')
-            ->first()
+        $items = ImmunizationSchedule::activeFor(ImmunizationSchedule::TARGET_CHILD)
             ?->items()
             ->with('vaccine')
             ->orderBy('minimum_age_days')
