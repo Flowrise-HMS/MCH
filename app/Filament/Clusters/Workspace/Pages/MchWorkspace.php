@@ -18,8 +18,10 @@ use Filament\Widgets\WidgetConfiguration;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Url;
+use Modules\Clinical\Classes\Actions\PatientActions;
 use Modules\Clinical\Enums\EncounterType;
 use Modules\Clinical\Models\Encounter;
+use Modules\Core\Classes\Support\PageHeaderActionsRegistry;
 use Modules\Core\Models\Branch;
 use Modules\Core\Settings\FeatureSettings;
 use Modules\Core\Support\OptionalClass;
@@ -226,6 +228,7 @@ class MchWorkspace extends Page
         $this->searchTerm = '';
         $this->searchResults = [];
         $this->pushRecent($patient->id);
+        $this->recacheHeaderActions();
     }
 
     public function clearPatient(): void
@@ -236,6 +239,7 @@ class MchWorkspace extends Page
         $this->activeTab = 'overview';
         $this->context = ['kind' => 'unknown', 'pregnancy' => null, 'childHealthRecord' => null];
         $this->currentEncounter = null;
+        $this->recacheHeaderActions();
     }
 
     public function setTab(string $tab): void
@@ -706,6 +710,57 @@ class MchWorkspace extends Page
     /**
      * @return array<int, WidgetConfiguration|class-string>
      */
+    /**
+     * Same patient actions as the Clinical workspace/profile pages, plus the
+     * vaccination card for children. Empty until a patient is selected.
+     */
+    protected function getHeaderActions(): array
+    {
+        if ($this->mode !== 'patient' || $this->currentPatient === null) {
+            return [];
+        }
+
+        $actions = PatientActions::make()
+            ->forPatient($this->currentPatient)
+            ->withEncounter($this->currentEncounter);
+
+        return [
+            $actions->clinicalWorkspaceAction(),
+            $actions->timelineAction(),
+            $actions->profileAction(),
+            $actions->medicationCanvasAction(),
+            $this->vaccinationCardAction(),
+            $actions->patientActionGroups(),
+            ...app(PageHeaderActionsRegistry::class)->for(static::class, $this),
+        ];
+    }
+
+    protected function vaccinationCardAction(): Action
+    {
+        return Action::make('vaccination_card')
+            ->label(__('Vaccination card'))
+            ->icon('heroicon-o-identification')
+            ->color('gray')
+            ->visible(fn (): bool => ($this->context['kind'] ?? null) === 'child' && $this->vaccinationCardUrl() !== null)
+            ->url(fn (): ?string => $this->vaccinationCardUrl(), shouldOpenInNewTab: true);
+    }
+
+    /**
+     * Filament caches header actions in `booted`, before a Livewire call such as
+     * selectPatient() changes the page state. Reset first so re-caching after a
+     * state change never duplicates the actions.
+     */
+    public function cacheInteractsWithHeaderActions(): void
+    {
+        $this->cachedHeaderActions = [];
+        parent::cacheInteractsWithHeaderActions();
+    }
+
+    protected function recacheHeaderActions(): void
+    {
+        $this->cacheInteractsWithHeaderActions();
+    }
+
     protected function getFooterWidgets(): array
     {
         if ($this->mode !== 'patient' || empty($this->currentPatient?->id)) {

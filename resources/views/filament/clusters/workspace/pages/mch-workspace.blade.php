@@ -207,9 +207,7 @@
                         @endif
                     </div>
                     <div class="flex flex-wrap gap-2">
-                        @if ($context['kind'] === 'child' && $this->vaccinationCardUrl())
-                            <x-filament::button tag="a" :href="$this->vaccinationCardUrl()" target="_blank" color="gray">Vaccination card</x-filament::button>
-                        @endif
+                        {{-- Vaccination card and the other patient actions live in the page header. --}}
                         <x-filament::button color="gray" wire:click="clearPatient">Clear</x-filament::button>
                     </div>
                 </div>
