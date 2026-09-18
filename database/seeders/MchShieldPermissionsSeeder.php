@@ -45,7 +45,7 @@ class MchShieldPermissionsSeeder extends Seeder
     {
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
-        $names = ['View MchCluster', 'View MchWorkspace'];
+        $names = ['View MchCluster', 'View MchWorkspace', 'View VaccinationCard'];
 
         foreach (self::RESOURCES as $resource) {
             foreach (self::ACTIONS as $action) {

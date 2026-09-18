@@ -109,12 +109,14 @@ All service classes live in `Modules/MCH/app/Classes/Services` (`Modules\MCH\Cla
 | Class | Role |
 |-------|------|
 | `PregnancyRiskService` | Derives `RiskLevel` from risk-factor values |
-| `MaternalVisitAssessmentService` | Records an ANC assessment; writes fundal height into `growth_measurements` |
+| `MaternalVisitAssessmentService` | Records an ANC assessment; derives GA and visit number from the linked episode when omitted; writes fundal height into `growth_measurements` and BP/weight through Clinical `VitalSignService`; danger signs always set `referral_required` |
 | `ChildVisitAssessmentService` | Records a CWC assessment plus child anthropometry rows |
 | `MchBookIssuanceService` | Issues / replaces books; serial + one-active-book invariants |
 | `AncReturnScheduler` | Optionally creates an Appointment return date when that module is enabled |
 
-`PregnancyEpisode` still derives risk and booking GA in `saving` via `PregnancyRiskService` so Filament create/edit stay consistent without a dedicated pregnancy-create service.
+`PregnancyEpisode` still derives risk and booking GA in `saving` via `PregnancyRiskService` so Filament create/edit stay consistent without a dedicated pregnancy-create service. When `edd` is blank and `edd_source` is LMP, `saving` also derives EDD as LMP + 280 days.
+
+The MCH Workspace registers patients through `Modules\Patient\Classes\Services\PatientService::create()` and its own Filament schemas (`registerForm`, `ancVisitForm`, `cwcVisitForm`), which reuse `quickElements()` from the resource form classes. A child registered with a mother gets a `patient_relationships` row (`type = mother`, subject = child, object = mother).
 
 ## Filament UI
 
@@ -137,7 +139,7 @@ Resources follow the Clinical nest: `Filament/Clusters/MCH/Resources/{Name}/` wi
 
 Each model has a Shield-style policy registered from `MchServiceProvider` (`ViewAny PregnancyEpisode`, `Create MaternalVisitAssessment`, …). Generate and assign those permissions in Shield before non-super-admin roles can open the cluster.
 
-`data_consented` is a stored flag only.
+`data_consented` is a stored flag only; the workspace book action asks for it with a checkbox but no flow enforces it. The printable `VaccinationCard` page requires `View VaccinationCard` and lists every active child-schedule dose with its due/overdue classification.
 
 ## Administrator Guide
 

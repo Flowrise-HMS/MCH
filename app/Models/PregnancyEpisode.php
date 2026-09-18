@@ -61,9 +61,18 @@ class PregnancyEpisode extends BaseModel implements ProvidesClientIdentity
         'outcome' => PregnancyOutcome::class,
     ];
 
+    /**
+     * Naegele's rule: expected date of delivery is 280 days after the LMP.
+     */
+    public const int GESTATION_DAYS = 280;
+
     protected static function booted(): void
     {
         static::saving(function (self $episode): void {
+            if ($episode->edd === null && $episode->lmp !== null && $episode->edd_source === EddSource::LMP) {
+                $episode->edd = $episode->lmp->copy()->addDays(self::GESTATION_DAYS);
+            }
+
             if (! $episode->risk_override) {
                 $episode->risk_level = app(PregnancyRiskService::class)->deriveRiskLevel(
                     array_map(fn ($factor) => $factor instanceof PregnancyRiskFactor ? $factor->value : $factor, $episode->risk_factors ?? []),

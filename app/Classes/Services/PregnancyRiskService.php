@@ -13,7 +13,7 @@ class PregnancyRiskService
     public function deriveRiskLevel(array $riskFactors): RiskLevel
     {
         foreach ($riskFactors as $factor) {
-            $case = PregnancyRiskFactor::tryFrom($factor);
+            $case = enum_try_from(PregnancyRiskFactor::class, $factor);
 
             if ($case !== null && $case->contributesToHighRisk()) {
                 return RiskLevel::HIGH;

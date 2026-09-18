@@ -22,13 +22,16 @@ class PregnancyEpisodeFactory extends Factory
             'branch_id' => Branch::factory(),
             'gravida' => fake()->numberBetween(1, 5),
             'parity' => fake()->numberBetween(0, 4),
-            'lmp' => ($lmp = fake()->dateTimeBetween('-24 weeks', '-2 weeks')->format('Y-m-d')),
+            'lmp' => fake()->dateTimeBetween('-24 weeks', '-2 weeks')->format('Y-m-d'),
             'edd_source' => EddSource::LMP,
             'multiple_gestation' => false,
             'risk_level' => RiskLevel::LOW,
             'risk_override' => false,
             'risk_factors' => [],
-            'booking_date' => Carbon::parse($lmp)->addWeek()->addDays(fake()->numberBetween(0, 7))->format('Y-m-d'),
+            'booking_date' => fn (array $attributes): string => Carbon::parse($attributes['lmp'])
+                ->addWeek()
+                ->addDays(fake()->numberBetween(0, 7))
+                ->format('Y-m-d'),
             'outcome' => PregnancyOutcome::ACTIVE,
         ];
     }

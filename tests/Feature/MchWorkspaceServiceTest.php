@@ -4,6 +4,8 @@ namespace Modules\MCH\Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
+use Modules\Clinical\Enums\EncounterStatus;
 use Modules\Clinical\Enums\EncounterType;
 use Modules\Core\Models\Branch;
 use Modules\MCH\Classes\Services\MchWorkspaceService;
@@ -145,5 +147,64 @@ class MchWorkspaceServiceTest extends TestCase
         $rows = $this->service->highRiskPregnancies($this->branch->id);
 
         $this->assertTrue($rows->contains(fn ($episode): bool => $episode->patient_id === $mother->id));
+    }
+
+    public function test_find_open_encounter_returns_only_todays_open_encounter_of_type(): void
+    {
+        $mother = Patient::factory()->female()->create(['branch_id' => $this->branch->id]);
+
+        $this->assertNull($this->service->findOpenEncounter($mother, EncounterType::ANTENATAL));
+
+        $encounter = $this->service->ensureEncounter($mother, EncounterType::ANTENATAL);
+
+        $this->assertSame($encounter->id, $this->service->findOpenEncounter($mother, EncounterType::ANTENATAL)?->id);
+        $this->assertNull($this->service->findOpenEncounter($mother, EncounterType::CHILD_WELFARE));
+
+        $encounter->forceFill(['status' => EncounterStatus::CANCELLED])->save();
+
+        $this->assertNull($this->service->findOpenEncounter($mother, EncounterType::ANTENATAL));
+    }
+
+    public function test_epi_due_patients_does_not_query_per_record(): void
+    {
+        $vaccine = Vaccine::create(['antigen' => VaccineAntigen::OPV, 'name' => 'OPV']);
+        $schedule = ImmunizationSchedule::create(['name' => 'Bounded EPI', 'target_population' => 'child']);
+
+        foreach ([1, 2, 3] as $dose) {
+            ImmunizationScheduleItem::create([
+                'immunization_schedule_id' => $schedule->id,
+                'vaccine_id' => $vaccine->id,
+                'dose_sequence' => $dose,
+                'minimum_age_days' => 0,
+            ]);
+        }
+
+        foreach (range(1, 4) as $i) {
+            $child = Patient::factory()->child()->create([
+                'branch_id' => $this->branch->id,
+                'date_of_birth' => now()->subDays(60),
+            ]);
+
+            foreach ([1, 2, 3] as $dose) {
+                ImmunizationRecord::create([
+                    'patient_id' => $child->id,
+                    'branch_id' => $this->branch->id,
+                    'vaccine_id' => $vaccine->id,
+                    'dose_sequence' => $dose,
+                    'status' => ImmunizationStatus::SCHEDULED,
+                ]);
+            }
+        }
+
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+
+        $rows = $this->service->epiDuePatients($this->branch->id);
+
+        $queries = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        $this->assertCount(4, $rows);
+        $this->assertLessThanOrEqual(5, $queries, "epiDuePatients ran {$queries} queries for 12 scheduled records");
     }
 }

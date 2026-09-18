@@ -25,7 +25,7 @@ class InfolistFormat
                     return method_exists($value, 'getLabel') ? (string) $value->getLabel() : $value->name;
                 }
 
-                $case = $enumClass::tryFrom((string) $value);
+                $case = enum_try_from($enumClass, (string) $value);
 
                 return $case !== null && method_exists($case, 'getLabel')
                     ? (string) $case->getLabel()

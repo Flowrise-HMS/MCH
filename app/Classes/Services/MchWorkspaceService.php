@@ -157,11 +157,14 @@ class MchWorkspaceService
         foreach ($records as $record) {
             $item = $itemsByKey->get($record->vaccine_id.'|'.$record->dose_sequence);
 
-            if ($item === null || $record->patient === null) {
+            if ($item === null || $record->patient === null || $record->patient->date_of_birth === null) {
                 continue;
             }
 
-            $classification = $this->epiDueService->classifyDose($record->patient, $item);
+            $classification = $this->epiDueService->classifyScheduledDose(
+                $this->epiDueService->getDateOfBirth($record->patient),
+                $item,
+            );
 
             if (! in_array($classification, ['due', 'overdue'], true)) {
                 continue;
@@ -216,18 +219,24 @@ class MchWorkspaceService
             ->get();
     }
 
-    public function ensureEncounter(Patient $patient, EncounterType $type, ?string $branchId = null): Encounter
+    /**
+     * Today's open encounter of the given type for the patient, if any.
+     */
+    public function findOpenEncounter(Patient $patient, EncounterType $type, ?string $branchId = null): ?Encounter
     {
-        $branchId ??= $patient->branch_id;
-
-        $existing = Encounter::query()
+        return Encounter::query()
             ->where('patient_id', $patient->id)
-            ->where('branch_id', $branchId)
+            ->where('branch_id', $branchId ?? $patient->branch_id)
             ->where('type', $type)
             ->whereDate('created_at', Carbon::today())
             ->whereNotIn('status', [EncounterStatus::FINISHED, EncounterStatus::CANCELLED])
             ->latest('created_at')
             ->first();
+    }
+
+    public function ensureEncounter(Patient $patient, EncounterType $type, ?string $branchId = null): Encounter
+    {
+        $existing = $this->findOpenEncounter($patient, $type, $branchId);
 
         if ($existing !== null) {
             return $existing;

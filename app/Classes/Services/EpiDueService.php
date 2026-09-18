@@ -93,7 +93,16 @@ class EpiDueService
             return 'complete';
         }
 
-        $dob = $this->getDateOfBirth($child);
+        return $this->classifyScheduledDose($this->getDateOfBirth($child), $item);
+    }
+
+    /**
+     * Classify a dose that is known not to be administered, without querying.
+     *
+     * @return 'not_yet_due'|'due'|'overdue'
+     */
+    public function classifyScheduledDose(Carbon $dob, ImmunizationScheduleItem $item): string
+    {
         $dueDate = $this->dueDateFor($dob, $item);
         $today = Carbon::today();
 
@@ -117,7 +126,7 @@ class EpiDueService
         return $dob->copy()->addDays((int) $item->minimum_age_days);
     }
 
-    private function getDateOfBirth(Patient $child): Carbon
+    public function getDateOfBirth(Patient $child): Carbon
     {
         if ($child->date_of_birth instanceof Carbon) {
             return $child->date_of_birth->copy()->startOfDay();

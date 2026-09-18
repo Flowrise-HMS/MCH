@@ -101,13 +101,20 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                            @forelse ($this->records() as $record)
+                            @forelse ($this->rows() as $row)
                                 <tr class="text-gray-950 dark:text-white">
-                                    <td class="py-2 pr-4">{{ $record->vaccine?->name ?? '—' }}</td>
-                                    <td class="py-2 pr-4">{{ $record->dose_sequence }}</td>
-                                    <td class="py-2 pr-4">{{ $record->status?->getLabel() ?? $record->status }}</td>
-                                    <td class="py-2 pr-4">{{ optional($record->administered_date)->toDateString() ?? '—' }}</td>
-                                    <td class="py-2">{{ $record->batch_lot ?? '—' }}</td>
+                                    <td class="py-2 pr-4">{{ $row['vaccine'] }}</td>
+                                    <td class="py-2 pr-4">{{ $row['dose'] }}</td>
+                                    <td class="py-2 pr-4">
+                                        {{ $row['status'] }}
+                                        @if ($row['classification'] === 'overdue')
+                                            <span class="text-danger-600">(overdue)</span>
+                                        @elseif ($row['classification'] === 'due')
+                                            <span class="text-warning-600">(due)</span>
+                                        @endif
+                                    </td>
+                                    <td class="py-2 pr-4">{{ $row['date'] ?? '—' }}</td>
+                                    <td class="py-2">{{ $row['batch_lot'] ?? '—' }}</td>
                                 </tr>
                             @empty
                                 <tr>

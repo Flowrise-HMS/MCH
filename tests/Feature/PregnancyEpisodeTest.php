@@ -101,4 +101,44 @@ class PregnancyEpisodeTest extends TestCase
 
         $this->assertSame(PregnancyOutcome::REFERRED_OUT, $episode->fresh()->outcome);
     }
+
+    public function test_derives_edd_from_lmp_when_edd_is_blank(): void
+    {
+        $patient = Patient::factory()->female()->create(['branch_id' => $this->branch->id]);
+        $lmp = now()->subWeeks(12)->startOfDay();
+
+        $episode = PregnancyEpisode::create([
+            'patient_id' => $patient->id,
+            'branch_id' => $this->branch->id,
+            'lmp' => $lmp->toDateString(),
+            'edd_source' => 'lmp',
+        ]);
+
+        $this->assertSame($lmp->copy()->addDays(280)->toDateString(), $episode->edd->toDateString());
+    }
+
+    public function test_keeps_explicit_edd_and_non_lmp_source(): void
+    {
+        $patient = Patient::factory()->female()->create(['branch_id' => $this->branch->id]);
+        $explicitEdd = now()->addWeeks(20)->toDateString();
+
+        $episode = PregnancyEpisode::create([
+            'patient_id' => $patient->id,
+            'branch_id' => $this->branch->id,
+            'lmp' => now()->subWeeks(12)->toDateString(),
+            'edd' => $explicitEdd,
+            'edd_source' => 'ultrasound',
+        ]);
+
+        $this->assertSame($explicitEdd, $episode->edd->toDateString());
+
+        $ultrasoundOnly = PregnancyEpisode::create([
+            'patient_id' => $patient->id,
+            'branch_id' => $this->branch->id,
+            'lmp' => now()->subWeeks(12)->toDateString(),
+            'edd_source' => 'ultrasound',
+        ]);
+
+        $this->assertNull($ultrasoundOnly->edd);
+    }
 }

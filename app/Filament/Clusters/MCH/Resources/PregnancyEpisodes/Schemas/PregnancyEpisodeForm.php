@@ -7,6 +7,7 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
@@ -34,29 +35,51 @@ class PregnancyEpisodeForm
             Section::make('Obstetric history')
                 ->columns(2)
                 ->schema([
-                    TextInput::make('gravida')->numeric()->minValue(0)->maxValue(30),
-                    TextInput::make('parity')->numeric()->minValue(0)->maxValue(30),
-                    DatePicker::make('lmp')->label('LMP'),
-                    DatePicker::make('edd')->label('EDD'),
-                    Select::make('edd_source')->options(EddSource::class)->default(EddSource::LMP->value),
-                    Toggle::make('multiple_gestation')->label('Multiple gestation'),
-                    DatePicker::make('booking_date'),
+                    ...self::obstetricElements(),
                     Select::make('outcome')->options(PregnancyOutcome::class)->default(PregnancyOutcome::ACTIVE->value),
                 ]),
             Section::make('Risk')
-                ->schema([
-                    CheckboxList::make('risk_factors')
-                        ->options(PregnancyRiskFactor::class)
-                        ->columns(2),
-                    Grid::make(2)->schema([
-                        Toggle::make('risk_override')
-                            ->label('Manual risk override')
-                            ->live(),
-                        Select::make('risk_level')
-                            ->options(RiskLevel::class)
-                            ->visible(fn (Get $get): bool => (bool) $get('risk_override')),
-                    ]),
-                ]),
+                ->schema(self::riskElements()),
         ]);
+    }
+
+    /**
+     * Booking fields shared by the resource form and the MCH workspace registration.
+     *
+     * @return array<int, Component>
+     */
+    public static function obstetricElements(): array
+    {
+        return [
+            TextInput::make('gravida')->numeric()->minValue(0)->maxValue(30),
+            TextInput::make('parity')->numeric()->minValue(0)->maxValue(30),
+            DatePicker::make('lmp')->label('LMP'),
+            DatePicker::make('edd')
+                ->label('EDD')
+                ->helperText('Leave blank to derive from LMP (LMP + 280 days).'),
+            Select::make('edd_source')->options(EddSource::class)->default(EddSource::LMP->value),
+            Toggle::make('multiple_gestation')->label('Multiple gestation'),
+            DatePicker::make('booking_date'),
+        ];
+    }
+
+    /**
+     * @return array<int, Component>
+     */
+    public static function riskElements(): array
+    {
+        return [
+            CheckboxList::make('risk_factors')
+                ->options(PregnancyRiskFactor::class)
+                ->columns(2),
+            Grid::make(2)->schema([
+                Toggle::make('risk_override')
+                    ->label('Manual risk override')
+                    ->live(),
+                Select::make('risk_level')
+                    ->options(RiskLevel::class)
+                    ->visible(fn (Get $get): bool => (bool) $get('risk_override')),
+            ]),
+        ];
     }
 }

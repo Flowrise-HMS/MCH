@@ -3,10 +3,19 @@
 namespace Modules\MCH\Filament\Clusters\Workspace\Pages;
 
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
+use Filament\Actions\Action;
+use Filament\Forms\Components\Checkbox;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Widgets\WidgetConfiguration;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Url;
 use Modules\Clinical\Enums\EncounterType;
@@ -22,7 +31,11 @@ use Modules\MCH\Classes\Services\MaternalVisitAssessmentService;
 use Modules\MCH\Classes\Services\MchBookIssuanceService;
 use Modules\MCH\Classes\Services\MchWorkspaceService;
 use Modules\MCH\Enums\GrowthMeasurementType;
+use Modules\MCH\Enums\PregnancyOutcome;
 use Modules\MCH\Filament\Clusters\MCH\Pages\VaccinationCard;
+use Modules\MCH\Filament\Clusters\MCH\Resources\ChildVisitAssessments\Schemas\ChildVisitAssessmentForm;
+use Modules\MCH\Filament\Clusters\MCH\Resources\MaternalVisitAssessments\Schemas\MaternalVisitAssessmentForm;
+use Modules\MCH\Filament\Clusters\MCH\Resources\PregnancyEpisodes\Schemas\PregnancyEpisodeForm;
 use Modules\MCH\Filament\Clusters\Workspace\MchWorkspaceCluster;
 use Modules\MCH\Filament\Widgets\PatientChildVisitsWidget;
 use Modules\MCH\Filament\Widgets\PatientGrowthMeasurementsWidget;
@@ -35,8 +48,11 @@ use Modules\MCH\Models\ImmunizationSchedule;
 use Modules\MCH\Models\MaternalVisitAssessment;
 use Modules\MCH\Models\PregnancyEpisode;
 use Modules\Patient\Classes\Services\PatientSearchService;
+use Modules\Patient\Classes\Services\PatientService;
 use Modules\Patient\Enums\Gender;
+use Modules\Patient\Enums\PatientRelationshipType;
 use Modules\Patient\Models\Patient;
+use Modules\Patient\Models\PatientRelationship;
 use Throwable;
 
 class MchWorkspace extends Page
@@ -102,12 +118,70 @@ class MchWorkspace extends Page
     public function mount(): void
     {
         $this->recentPatientIds = session()->get('mch_workspace.recent', []);
-        $this->ancVisitData = $this->defaultAncVisitData();
-        $this->cwcVisitData = $this->defaultCwcVisitData();
+        $this->registerForm->fill();
+        $this->ancVisitForm->fill();
+        $this->cwcVisitForm->fill();
 
         if ($this->patientId) {
             $this->selectPatient($this->patientId);
         }
+    }
+
+    public function registerForm(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                Section::make('Demographics')
+                    ->columns(2)
+                    ->schema([
+                        TextInput::make('first_name')->required()->maxLength(100),
+                        TextInput::make('last_name')->required()->maxLength(100),
+                        DatePicker::make('date_of_birth')->required()->maxDate(now()),
+                        Select::make('gender')
+                            ->options(Gender::class)
+                            ->required()
+                            ->visible(fn (): bool => $this->registerKind === 'child'),
+                        TextInput::make('phone')->tel()->maxLength(32),
+                        Select::make('mother_patient_id')
+                            ->label('Mother (optional)')
+                            ->searchable()
+                            ->getSearchResultsUsing(fn (string $search): array => $this->motherOptions($search))
+                            ->getOptionLabelUsing(fn (?string $value): ?string => $value ? Patient::query()->find($value)?->full_name : null)
+                            ->visible(fn (): bool => $this->registerKind === 'child'),
+                    ]),
+                Section::make('Booking')
+                    ->columns(2)
+                    ->visible(fn (): bool => $this->registerKind === 'mother')
+                    ->schema(PregnancyEpisodeForm::obstetricElements()),
+                Section::make('Risk')
+                    ->visible(fn (): bool => $this->registerKind === 'mother')
+                    ->schema(PregnancyEpisodeForm::riskElements()),
+            ])
+            ->statePath('registerData');
+    }
+
+    public function ancVisitForm(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                Grid::make(2)->schema([
+                    ...MaternalVisitAssessmentForm::vitalsElements(),
+                    ...MaternalVisitAssessmentForm::quickElements(),
+                ]),
+            ])
+            ->statePath('ancVisitData');
+    }
+
+    public function cwcVisitForm(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                Grid::make(2)->schema([
+                    ...ChildVisitAssessmentForm::anthropometryElements(),
+                    ...ChildVisitAssessmentForm::quickElements(),
+                ]),
+            ])
+            ->statePath('cwcVisitData');
     }
 
     public function updatedSearchTerm(): void
@@ -147,8 +221,8 @@ class MchWorkspace extends Page
         $this->context = app(MchWorkspaceService::class)->resolveContext($patient);
         $this->activeTab = 'overview';
         $this->currentEncounter = $this->openEncounterForContext();
-        $this->ancVisitData = $this->defaultAncVisitData();
-        $this->cwcVisitData = $this->defaultCwcVisitData();
+        $this->ancVisitForm->fill();
+        $this->cwcVisitForm->fill();
         $this->searchTerm = '';
         $this->searchResults = [];
         $this->pushRecent($patient->id);
@@ -177,18 +251,16 @@ class MchWorkspace extends Page
     {
         $this->registerKind = in_array($kind, ['mother', 'child'], true) ? $kind : 'mother';
         $this->mode = 'register';
-        $this->registerData = [
-            'first_name' => '',
-            'last_name' => '',
-            'date_of_birth' => null,
-            'phone' => '',
-        ];
+        $this->registerForm->fill([
+            'gender' => $this->registerKind === 'mother' ? Gender::FEMALE->value : null,
+            'booking_date' => now()->toDateString(),
+        ]);
     }
 
     public function cancelRegistration(): void
     {
         $this->mode = 'home';
-        $this->registerData = [];
+        $this->registerForm->fill();
     }
 
     public function submitRegistration(): void
@@ -201,48 +273,39 @@ class MchWorkspace extends Page
             return;
         }
 
-        $first = trim((string) ($this->registerData['first_name'] ?? ''));
-        $last = trim((string) ($this->registerData['last_name'] ?? ''));
+        $data = $this->registerForm->getState();
 
-        if ($first === '' || $last === '') {
-            Notification::make()->title('Name required')->danger()->send();
+        try {
+            $patient = app(PatientService::class)->create([
+                'branch_id' => $branchId,
+                'first_name' => trim((string) $data['first_name']),
+                'last_name' => trim((string) $data['last_name']),
+                'date_of_birth' => $data['date_of_birth'],
+                'gender' => $this->registerKind === 'mother' ? Gender::FEMALE->value : $data['gender'],
+                'phone' => filled($data['phone'] ?? null) ? $data['phone'] : null,
+            ]);
+
+            if ($this->registerKind === 'mother') {
+                PregnancyEpisode::create([
+                    ...collect($data)->only([
+                        'gravida', 'parity', 'lmp', 'edd', 'edd_source', 'multiple_gestation',
+                        'booking_date', 'risk_factors', 'risk_override', 'risk_level',
+                    ])->filter(fn ($value): bool => $value !== null && $value !== '')->all(),
+                    'patient_id' => $patient->id,
+                    'branch_id' => $branchId,
+                    'recorded_by' => Auth::id(),
+                ]);
+            } else {
+                $this->registerChild($patient, $branchId, $data['mother_patient_id'] ?? null);
+            }
+        } catch (Throwable $e) {
+            Notification::make()->title('Registration failed')->body($e->getMessage())->danger()->send();
 
             return;
         }
 
-        $factory = $this->registerKind === 'mother'
-            ? Patient::factory()->female()
-            : Patient::factory()->child();
-
-        $patient = $factory->create([
-            'branch_id' => $branchId,
-            'first_name' => $first,
-            'last_name' => $last,
-            'date_of_birth' => $this->registerData['date_of_birth']
-                ?? now()->subYears($this->registerKind === 'child' ? 1 : 25)->toDateString(),
-            'phone' => $this->registerData['phone'] ?: null,
-            'gender' => $this->registerKind === 'mother' ? Gender::FEMALE : Gender::MALE,
-        ]);
-
-        if ($this->registerKind === 'mother') {
-            PregnancyEpisode::create([
-                'patient_id' => $patient->id,
-                'branch_id' => $branchId,
-                'lmp' => now()->subMonths(4)->toDateString(),
-                'edd' => now()->addMonths(5)->toDateString(),
-                'booking_date' => now()->toDateString(),
-                'recorded_by' => Auth::id(),
-            ]);
-        } else {
-            ChildHealthRecord::create([
-                'patient_id' => $patient->id,
-                'branch_id' => $branchId,
-                'date_of_birth' => $patient->date_of_birth?->toDateString(),
-                'recorded_by' => Auth::id(),
-            ]);
-        }
-
-        Notification::make()->title('Registered')->success()->send();
+        $this->registerForm->fill();
+        Notification::make()->title('Registered')->body("{$patient->full_name} ({$patient->mrn})")->success()->send();
         $this->selectPatient($patient->id);
     }
 
@@ -254,13 +317,9 @@ class MchWorkspace extends Page
             return;
         }
 
-        $type = $this->context['kind'] === 'mother'
-            ? EncounterType::ANTENATAL
-            : EncounterType::CHILD_WELFARE;
-
         try {
             $this->currentEncounter = app(MchWorkspaceService::class)
-                ->ensureEncounter($this->currentPatient, $type);
+                ->ensureEncounter($this->currentPatient, $this->encounterTypeForContext());
 
             Notification::make()->title('Encounter ready')->success()->send();
             $this->activeTab = $this->context['kind'] === 'mother' ? 'anc-visit' : 'cwc-visit';
@@ -275,13 +334,16 @@ class MchWorkspace extends Page
             return;
         }
 
+        $data = $this->ancVisitForm->getState();
+
         try {
             $encounter = $this->currentEncounter
                 ?? app(MchWorkspaceService::class)->ensureEncounter($this->currentPatient, EncounterType::ANTENATAL);
             $this->currentEncounter = $encounter;
 
             $assessment = app(MaternalVisitAssessmentService::class)->record($encounter, [
-                ...$this->ancVisitData,
+                ...$data,
+                'fundal_height_unit' => 'cm',
                 'pregnancy_episode_id' => $this->context['pregnancy']?->id,
                 'recorded_by' => Auth::id(),
             ]);
@@ -291,7 +353,7 @@ class MchWorkspace extends Page
             }
 
             Notification::make()->title('ANC visit saved')->success()->send();
-            $this->ancVisitData = $this->defaultAncVisitData();
+            $this->ancVisitForm->fill();
             $this->activeTab = 'overview';
         } catch (Throwable $e) {
             Notification::make()->title('ANC visit failed')->body($e->getMessage())->danger()->send();
@@ -304,48 +366,37 @@ class MchWorkspace extends Page
             return;
         }
 
+        $data = $this->cwcVisitForm->getState();
+
         try {
             $encounter = $this->currentEncounter
                 ?? app(MchWorkspaceService::class)->ensureEncounter($this->currentPatient, EncounterType::CHILD_WELFARE);
             $this->currentEncounter = $encounter;
 
+            $anthropometry = [
+                'weight' => [GrowthMeasurementType::WEIGHT, 'kg'],
+                'length' => [GrowthMeasurementType::LENGTH_HEIGHT, 'cm'],
+                'muac' => [GrowthMeasurementType::MUAC, 'cm'],
+                'head_circumference' => [GrowthMeasurementType::HEAD_CIRCUMFERENCE, 'cm'],
+            ];
+
             $measurements = [];
 
-            if (! empty($this->cwcVisitData['weight'])) {
-                $measurements[] = [
-                    'type' => GrowthMeasurementType::WEIGHT,
-                    'value' => $this->cwcVisitData['weight'],
-                    'unit' => 'kg',
-                ];
-            }
-
-            if (! empty($this->cwcVisitData['length'])) {
-                $measurements[] = [
-                    'type' => GrowthMeasurementType::LENGTH_HEIGHT,
-                    'value' => $this->cwcVisitData['length'],
-                    'unit' => 'cm',
-                ];
-            }
-
-            if (! empty($this->cwcVisitData['muac'])) {
-                $measurements[] = [
-                    'type' => GrowthMeasurementType::MUAC,
-                    'value' => $this->cwcVisitData['muac'],
-                    'unit' => 'cm',
-                ];
+            foreach ($anthropometry as $key => [$type, $unit]) {
+                if (filled($data[$key] ?? null)) {
+                    $measurements[] = ['type' => $type, 'value' => $data[$key], 'unit' => $unit];
+                }
             }
 
             app(ChildVisitAssessmentService::class)->record($encounter, [
+                ...collect($data)->except(array_keys($anthropometry))->all(),
                 'child_health_record_id' => $this->context['childHealthRecord']?->id,
-                'notes' => $this->cwcVisitData['notes'] ?? null,
-                'vitamin_a_given' => (bool) ($this->cwcVisitData['vitamin_a_given'] ?? false),
-                'dewormed' => (bool) ($this->cwcVisitData['dewormed'] ?? false),
                 'measurements' => $measurements,
                 'recorded_by' => Auth::id(),
             ]);
 
             Notification::make()->title('CWC visit saved')->success()->send();
-            $this->cwcVisitData = $this->defaultCwcVisitData();
+            $this->cwcVisitForm->fill();
             $this->activeTab = 'overview';
         } catch (Throwable $e) {
             Notification::make()->title('CWC visit failed')->body($e->getMessage())->danger()->send();
@@ -417,9 +468,26 @@ class MchWorkspace extends Page
         }
     }
 
-    public function issueBook(string $unit): void
+    public function issueBookAction(): Action
     {
-        if ($this->currentPatient === null) {
+        $unit = $this->bookUnitForContext();
+
+        return Action::make('issueBook')
+            ->label($unit ? "Issue {$unit} book" : 'Issue book')
+            ->visible(fn (): bool => $unit !== null)
+            ->schema([
+                Checkbox::make('data_consented')
+                    ->label('Client consents to their MCH data being used for follow-up and reporting')
+                    ->default(false),
+            ])
+            ->action(fn (array $data) => $this->issueBook($data['data_consented'] ?? false));
+    }
+
+    public function issueBook(bool $dataConsented = false): void
+    {
+        $unit = $this->bookUnitForContext();
+
+        if ($this->currentPatient === null || $unit === null) {
             return;
         }
 
@@ -444,7 +512,7 @@ class MchWorkspace extends Page
                 $owner,
                 $branch,
                 $unit,
-                ['data_consented' => true, 'consented_by' => Auth::id()],
+                ['data_consented' => $dataConsented, 'consented_by' => Auth::id()],
                 Auth::user(),
             );
             Notification::make()->title('Book issued')->success()->send();
@@ -548,6 +616,22 @@ class MchWorkspace extends Page
             ->get();
     }
 
+    /**
+     * Gestational age today for the active pregnancy, for the patient banner.
+     */
+    public function gestationalAgeToday(): ?string
+    {
+        $pregnancy = $this->context['pregnancy'] ?? null;
+
+        if (! $pregnancy instanceof PregnancyEpisode) {
+            return null;
+        }
+
+        $ga = $pregnancy->gestationalAgeAt(Carbon::today());
+
+        return $ga === null ? null : "{$ga['weeks']}w {$ga['days']}d";
+    }
+
     public function vaccinationCardUrl(): ?string
     {
         if ($this->currentPatient === null) {
@@ -608,32 +692,60 @@ class MchWorkspace extends Page
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<string, string>
      */
-    private function defaultAncVisitData(): array
+    private function motherOptions(string $search): array
     {
-        return [
-            'ga_weeks' => null,
-            'fetal_heart_rate' => null,
-            'fundal_height' => null,
-            'return_date' => null,
-            'notes' => null,
-        ];
+        return app(PatientSearchService::class)
+            ->search($search, 10)
+            ->filter(fn (Patient $patient): bool => $patient->gender === Gender::FEMALE)
+            ->mapWithKeys(fn (Patient $patient): array => [$patient->id => $patient->full_name.' ('.($patient->mrn ?? '—').')'])
+            ->all();
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function defaultCwcVisitData(): array
+    private function registerChild(Patient $child, string $branchId, ?string $motherPatientId): void
     {
-        return [
-            'weight' => null,
-            'length' => null,
-            'muac' => null,
-            'notes' => null,
-            'vitamin_a_given' => false,
-            'dewormed' => false,
-        ];
+        $mother = filled($motherPatientId) ? Patient::query()->find($motherPatientId) : null;
+
+        $episodeId = $mother === null ? null : PregnancyEpisode::query()
+            ->where('patient_id', $mother->id)
+            ->where('outcome', '!=', PregnancyOutcome::ACTIVE)
+            ->latest('edd')
+            ->value('id');
+
+        ChildHealthRecord::create([
+            'patient_id' => $child->id,
+            'branch_id' => $branchId,
+            'pregnancy_episode_id' => $episodeId,
+            'date_of_birth' => $child->date_of_birth?->toDateString(),
+            'recorded_by' => Auth::id(),
+        ]);
+
+        if ($mother !== null) {
+            PatientRelationship::query()->firstOrCreate([
+                'subject_type' => $child->getMorphClass(),
+                'subject_id' => $child->id,
+                'object_type' => $mother->getMorphClass(),
+                'object_id' => $mother->id,
+                'type' => PatientRelationshipType::MOTHER,
+            ], ['created_by' => Auth::id()]);
+        }
+    }
+
+    private function encounterTypeForContext(): EncounterType
+    {
+        return $this->context['kind'] === 'mother'
+            ? EncounterType::ANTENATAL
+            : EncounterType::CHILD_WELFARE;
+    }
+
+    private function bookUnitForContext(): ?string
+    {
+        return match ($this->context['kind']) {
+            'mother' => 'ANC',
+            'child' => 'CWC',
+            default => null,
+        };
     }
 
     private function openEncounterForContext(): ?Encounter
@@ -642,17 +754,8 @@ class MchWorkspace extends Page
             return null;
         }
 
-        $type = $this->context['kind'] === 'mother'
-            ? EncounterType::ANTENATAL
-            : EncounterType::CHILD_WELFARE;
-
-        return Encounter::query()
-            ->where('patient_id', $this->currentPatient->id)
-            ->where('type', $type)
-            ->whereDate('created_at', now()->toDateString())
-            ->whereNotIn('status', ['finished', 'cancelled'])
-            ->latest('created_at')
-            ->first();
+        return app(MchWorkspaceService::class)
+            ->findOpenEncounter($this->currentPatient, $this->encounterTypeForContext());
     }
 
     private function pushRecent(string $patientId): void

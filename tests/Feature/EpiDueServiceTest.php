@@ -3,6 +3,7 @@
 namespace Modules\MCH\Tests\Feature;
 
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
 use Modules\Core\Models\Branch;
 use Modules\MCH\Classes\Services\EpiDueService;
 use Modules\MCH\Enums\ImmunizationStatus;
@@ -157,5 +158,31 @@ class EpiDueServiceTest extends TestCase
 
         $this->assertSame('due', $service->classifyDose($newborn, $bcgItem));
         $this->assertSame('not_yet_due', $service->classifyDose($newborn, $opvItem));
+    }
+
+    public function test_classify_scheduled_dose_matches_classify_dose_without_querying(): void
+    {
+        $schedule = $this->setupSchedule();
+        $branch = Branch::factory()->create();
+        $child = Patient::factory()->child()->create([
+            'branch_id' => $branch->id,
+            'date_of_birth' => now()->subDays(50),
+        ]);
+
+        $bcgItem = $schedule->items()->whereHas('vaccine', fn ($query) => $query->where('antigen', VaccineAntigen::BCG))->firstOrFail();
+        $opvItem = $schedule->items()->whereHas('vaccine', fn ($query) => $query->where('antigen', VaccineAntigen::OPV))->firstOrFail();
+        $opvItem->forceFill(['maximum_age_days' => 45])->save();
+
+        $service = app(EpiDueService::class);
+        $dob = $service->getDateOfBirth($child);
+
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+
+        $this->assertSame('due', $service->classifyScheduledDose($dob, $bcgItem));
+        $this->assertSame('overdue', $service->classifyScheduledDose($dob, $opvItem));
+
+        $this->assertCount(0, DB::getQueryLog());
+        DB::disableQueryLog();
     }
 }

@@ -36,19 +36,8 @@
             @if ($mode === 'register')
                 <x-filament::section>
                     <x-slot name="heading">Register {{ $registerKind }}</x-slot>
-                    <div class="grid gap-4 sm:grid-cols-2">
-                        <x-filament::input.wrapper>
-                            <x-filament::input type="text" wire:model="registerData.first_name" placeholder="First name" />
-                        </x-filament::input.wrapper>
-                        <x-filament::input.wrapper>
-                            <x-filament::input type="text" wire:model="registerData.last_name" placeholder="Last name" />
-                        </x-filament::input.wrapper>
-                        <x-filament::input.wrapper>
-                            <x-filament::input type="date" wire:model="registerData.date_of_birth" />
-                        </x-filament::input.wrapper>
-                        <x-filament::input.wrapper>
-                            <x-filament::input type="text" wire:model="registerData.phone" placeholder="Phone" />
-                        </x-filament::input.wrapper>
+                    <div wire:key="mch-register-{{ $registerKind }}">
+                        {{ $this->registerForm }}
                     </div>
                     <div class="mt-4 flex gap-2">
                         <x-filament::button wire:click="submitRegistration">Save</x-filament::button>
@@ -171,7 +160,10 @@
                             @if ($context['kind'] === 'mother')
                                 Pregnant
                                 @if ($context['pregnancy'])
-                                    · EDD {{ optional($context['pregnancy']->edd)->toDateString() }}
+                                    · EDD {{ optional($context['pregnancy']->edd)->toDateString() ?? '—' }}
+                                    @if ($ga = $this->gestationalAgeToday())
+                                        · GA {{ $ga }}
+                                    @endif
                                     · {{ $context['pregnancy']->risk_level?->getLabel() }}
                                 @endif
                             @elseif ($context['kind'] === 'child')
@@ -226,46 +218,13 @@
                         <p class="mt-3 text-sm text-gray-600">Using encounter {{ $currentEncounter->encounter_number ?? $currentEncounter->id }}.</p>
                     @endif
                 @elseif ($activeTab === 'anc-visit')
-                    <div class="grid gap-3 sm:grid-cols-2">
-                        <x-filament::input.wrapper>
-                            <x-filament::input type="number" wire:model="ancVisitData.ga_weeks" placeholder="GA weeks" />
-                        </x-filament::input.wrapper>
-                        <x-filament::input.wrapper>
-                            <x-filament::input type="number" wire:model="ancVisitData.fetal_heart_rate" placeholder="FHR" />
-                        </x-filament::input.wrapper>
-                        <x-filament::input.wrapper>
-                            <x-filament::input type="number" wire:model="ancVisitData.fundal_height" placeholder="Fundal height cm" />
-                        </x-filament::input.wrapper>
-                        <x-filament::input.wrapper>
-                            <x-filament::input type="date" wire:model="ancVisitData.return_date" />
-                        </x-filament::input.wrapper>
-                        <div class="sm:col-span-2">
-                            <x-filament::input.wrapper>
-                                <x-filament::input type="text" wire:model="ancVisitData.notes" placeholder="Notes" />
-                            </x-filament::input.wrapper>
-                        </div>
-                    </div>
+                    <p class="mb-3 text-xs text-gray-500">BP and weight are saved to the Clinical vitals record for this encounter.</p>
+                    {{ $this->ancVisitForm }}
                     <div class="mt-4">
                         <x-filament::button wire:click="saveAncVisit">Save ANC visit</x-filament::button>
                     </div>
                 @elseif ($activeTab === 'cwc-visit')
-                    <div class="grid gap-3 sm:grid-cols-2">
-                        <x-filament::input.wrapper>
-                            <x-filament::input type="number" step="0.01" wire:model="cwcVisitData.weight" placeholder="Weight kg" />
-                        </x-filament::input.wrapper>
-                        <x-filament::input.wrapper>
-                            <x-filament::input type="number" step="0.1" wire:model="cwcVisitData.length" placeholder="Length cm" />
-                        </x-filament::input.wrapper>
-                        <x-filament::input.wrapper>
-                            <x-filament::input type="number" step="0.1" wire:model="cwcVisitData.muac" placeholder="MUAC cm" />
-                        </x-filament::input.wrapper>
-                        <label class="flex items-center gap-2 text-sm">
-                            <input type="checkbox" wire:model="cwcVisitData.vitamin_a_given" /> Vitamin A given
-                        </label>
-                        <label class="flex items-center gap-2 text-sm">
-                            <input type="checkbox" wire:model="cwcVisitData.dewormed" /> Dewormed
-                        </label>
-                    </div>
+                    {{ $this->cwcVisitForm }}
                     <div class="mt-4">
                         <x-filament::button wire:click="saveCwcVisit">Save CWC visit</x-filament::button>
                     </div>
@@ -303,12 +262,7 @@
                     </p>
                 @elseif ($activeTab === 'books')
                     <div class="flex gap-2">
-                        @if ($context['kind'] === 'mother')
-                            <x-filament::button wire:click="issueBook('ANC')">Issue ANC book</x-filament::button>
-                        @endif
-                        @if ($context['kind'] === 'child')
-                            <x-filament::button wire:click="issueBook('CWC')">Issue CWC book</x-filament::button>
-                        @endif
+                        {{ $this->issueBookAction }}
                     </div>
                 @elseif ($activeTab === 'vitals')
                     @if ($vitalsOverview = $this->vitalsOverviewWidgetClass())

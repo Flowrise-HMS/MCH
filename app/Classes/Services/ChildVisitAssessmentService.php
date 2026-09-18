@@ -44,7 +44,7 @@ class ChildVisitAssessmentService
                 $type = $measurement['type'] ?? '';
                 $type = $type instanceof GrowthMeasurementType
                     ? $type
-                    : (GrowthMeasurementType::tryFrom($type) ?? $type);
+                    : (enum_try_from(GrowthMeasurementType::class, $type) ?? $type);
 
                 GrowthMeasurement::create([
                     'patient_id' => $assessment->patient_id,
