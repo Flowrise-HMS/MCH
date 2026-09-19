@@ -6,7 +6,7 @@ use BackedEnum;
 use Filament\Clusters\Cluster;
 use Filament\Pages\Enums\SubNavigationPosition;
 use Filament\Support\Icons\Heroicon;
-use Modules\Core\Enums\NavigationGroup;
+use Modules\Core\Enums\SidebarGroup;
 
 class MchWorkspaceCluster extends Cluster
 {
@@ -18,9 +18,9 @@ class MchWorkspaceCluster extends Cluster
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedHeart;
 
-    protected static string|\UnitEnum|null $navigationGroup = NavigationGroup::CLINICAL;
+    protected static string|\UnitEnum|null $navigationGroup = SidebarGroup::Workspaces;
 
-    protected static ?int $navigationSort = 19;
+    protected static ?int $navigationSort = 20;
 
     protected static ?SubNavigationPosition $subNavigationPosition = SubNavigationPosition::Top;
 
