@@ -409,7 +409,17 @@ class MchWorkspace extends Page
 
     public function generateEpiDues(): void
     {
-        if ($this->currentPatient === null || $this->context['kind'] === 'unknown') {
+        if ($this->currentPatient === null) {
+            return;
+        }
+
+        if ($this->context['kind'] === 'unknown') {
+            Notification::make()
+                ->title('No active pregnancy or child health record')
+                ->body('Register an active pregnancy episode (for TT dues) or a child welfare record (for EPI dues) first.')
+                ->warning()
+                ->send();
+
             return;
         }
 
@@ -427,15 +437,34 @@ class MchWorkspace extends Page
             return;
         }
 
-        $created = app(EpiDueService::class)->generateDueRecords(
+        $epiDueService = app(EpiDueService::class);
+        $created = $epiDueService->generateDueRecords(
             $this->currentPatient,
             $schedule,
             $this->currentPatient->branch_id,
             $isMother ? ($this->context['pregnancy']?->booking_date ?? Carbon::today()) : null,
         );
 
-        Notification::make()
-            ->title('EPI dues generated')
+        $report = $epiDueService->lastGenerationReport();
+        $notification = Notification::make()->title($isMother ? 'TT dues generated' : 'EPI dues generated');
+
+        if ($created->isEmpty()) {
+            $reasons = array_filter([
+                $report['skipped_existing'] > 0 ? $report['skipped_existing'].' already recorded' : null,
+                $report['skipped_future'] > 0 ? $report['skipped_future'].' not yet due' : null,
+                $report['skipped_dependency'] > 0 ? $report['skipped_dependency'].' waiting for the previous dose to be administered' : null,
+            ]);
+
+            $notification
+                ->title('No new doses scheduled')
+                ->body($reasons === [] ? 'The schedule has no doses for this patient.' : implode('; ', $reasons).'.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $notification
             ->body($created->count().' scheduled dose(s).')
             ->success()
             ->send();
@@ -504,7 +533,15 @@ class MchWorkspace extends Page
             return;
         }
 
-        $episode->update(['outcome' => enum_from(PregnancyOutcome::class, $outcome)]);
+        $resolvedOutcome = enum_try_from(PregnancyOutcome::class, $outcome);
+
+        if ($resolvedOutcome === null) {
+            Notification::make()->title('Unknown pregnancy outcome')->body('Choose one of the listed outcomes.')->warning()->send();
+
+            return;
+        }
+
+        $episode->update(['outcome' => $resolvedOutcome]);
 
         Notification::make()->title('Pregnancy outcome recorded')->success()->send();
         $this->selectPatient($this->currentPatient->id);

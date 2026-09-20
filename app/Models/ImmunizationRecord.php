@@ -24,6 +24,7 @@ class ImmunizationRecord extends BaseModel implements ProvidesClientIdentity
         'vaccine_id',
         'dose_sequence',
         'status',
+        'due_date',
         'administered_date',
         'batch_lot',
         'site',
@@ -36,6 +37,7 @@ class ImmunizationRecord extends BaseModel implements ProvidesClientIdentity
 
     protected $casts = [
         'administered_date' => 'date',
+        'due_date' => 'date',
         'status' => ImmunizationStatus::class,
         'dose_sequence' => 'integer',
     ];

@@ -166,6 +166,40 @@ class EpiAppointmentSchedulingTest extends TestCase
 
         $this->assertNotNull($appointment);
         $this->assertTrue(Carbon::parse($appointment->start_at)->isToday());
+        // Booked through AppointmentSchedulingService, so the sync outbox has the event.
+        $this->assertDatabaseHas('appointment_sync_outbox', [
+            'aggregate_id' => $appointment->id,
+            'event_name' => 'appointment.booked',
+        ]);
+    }
+
+    public function test_books_on_the_stored_due_date_when_present(): void
+    {
+        $tt = Vaccine::create(['antigen' => VaccineAntigen::TETANUS_TOXOID, 'name' => 'TT']);
+        $maternal = ImmunizationSchedule::create([
+            'name' => 'Maternal TT Due Date',
+            'target_population' => ImmunizationSchedule::TARGET_MATERNAL,
+        ]);
+        ImmunizationScheduleItem::create([
+            'immunization_schedule_id' => $maternal->id,
+            'vaccine_id' => $tt->id,
+            'dose_sequence' => 3,
+            'minimum_age_days' => 182,
+        ]);
+        $mother = Patient::factory()->female()->create(['branch_id' => $this->branch->id, 'date_of_birth' => null]);
+        $record = ImmunizationRecord::create([
+            'patient_id' => $mother->id,
+            'branch_id' => $this->branch->id,
+            'vaccine_id' => $tt->id,
+            'dose_sequence' => 3,
+            'status' => ImmunizationStatus::SCHEDULED,
+            'due_date' => now()->addDays(4)->toDateString(),
+        ]);
+
+        $appointment = app(EpiAppointmentScheduler::class)->schedule($record);
+
+        $this->assertNotNull($appointment);
+        $this->assertSame(now()->addDays(4)->toDateString(), Carbon::parse($appointment->start_at)->toDateString());
     }
 
     public function test_returns_null_when_no_active_child_schedule_item_matches(): void

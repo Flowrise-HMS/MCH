@@ -96,6 +96,7 @@
                                 <th class="py-2 pr-4 font-medium">Vaccine</th>
                                 <th class="py-2 pr-4 font-medium">Dose</th>
                                 <th class="py-2 pr-4 font-medium">Status</th>
+                                <th class="py-2 pr-4 font-medium">Due</th>
                                 <th class="py-2 pr-4 font-medium">Date</th>
                                 <th class="py-2 font-medium">Batch / lot</th>
                             </tr>
@@ -113,6 +114,7 @@
                                             <span class="text-warning-600">(due)</span>
                                         @endif
                                     </td>
+                                    <td class="py-2 pr-4">{{ $row['due_date'] ?? '—' }}</td>
                                     <td class="py-2 pr-4">{{ $row['date'] ?? '—' }}</td>
                                     <td class="py-2">{{ $row['batch_lot'] ?? '—' }}</td>
                                 </tr>

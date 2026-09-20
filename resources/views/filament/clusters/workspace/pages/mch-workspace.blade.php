@@ -97,7 +97,7 @@
                                 <button type="button" wire:click="selectPatient('{{ $row['patient']->id }}')" class="w-full px-1 py-2 text-left hover:text-primary-600">
                                     {{ $row['patient']->full_name }}
                                     <span class="text-xs {{ $row['overdue'] ? 'text-danger-600' : 'text-gray-500' }}">
-                                        {{ $row['overdue'] ? 'overdue' : 'due' }} · {{ $row['scheduled_count'] }}
+                                        {{ $row['overdue'] ? 'overdue' : 'due' }} · {{ $row['scheduled_count'] }}@if (! empty($row['next_due_date'])) · due {{ $row['next_due_date']->format('d M Y') }}@endif
                                     </span>
                                 </button>
                             </li>

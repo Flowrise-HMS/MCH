@@ -121,6 +121,7 @@ class VaccinationCard extends Page
                 'dose' => (int) $item->dose_sequence,
                 'status' => 'Not given',
                 'date' => null,
+                'due_date' => $dob === null ? null : $epiDueService->dueDateFor($dob, $item)->toDateString(),
                 'batch_lot' => null,
                 'classification' => $dob === null ? null : $epiDueService->classifyScheduledDose($dob, $item),
             ]);
@@ -145,6 +146,7 @@ class VaccinationCard extends Page
             'dose' => (int) $record->dose_sequence,
             'status' => $record->status?->getLabel() ?? (string) $record->status,
             'date' => $record->administered_date?->toDateString(),
+            'due_date' => $record->due_date?->toDateString(),
             'batch_lot' => $record->batch_lot,
             'classification' => null,
         ];

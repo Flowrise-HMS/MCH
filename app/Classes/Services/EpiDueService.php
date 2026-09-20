@@ -12,6 +12,9 @@ use Modules\Patient\Models\Patient;
 
 class EpiDueService
 {
+    /** @var array{created: int, skipped_future: int, skipped_dependency: int, skipped_existing: int} */
+    private array $lastGenerationReport = ['created' => 0, 'skipped_future' => 0, 'skipped_dependency' => 0, 'skipped_existing' => 0];
+
     public function __construct(
         private EpiAppointmentScheduler $appointmentScheduler,
     ) {}
@@ -36,6 +39,7 @@ class EpiDueService
         ?Carbon $anchorDate = null,
     ): Collection {
         $now = Carbon::now();
+        $this->lastGenerationReport = ['created' => 0, 'skipped_future' => 0, 'skipped_dependency' => 0, 'skipped_existing' => 0];
         $childDob = $schedule->isMaternal() ? null : $this->getDateOfBirth($patient);
 
         $items = $schedule->items()->with('vaccine')->get();
@@ -60,6 +64,8 @@ class EpiDueService
             $key = $this->doseKey($item->vaccine_id, $item->dose_sequence);
 
             if (in_array($key, $existingKeys, true)) {
+                $this->lastGenerationReport['skipped_existing']++;
+
                 continue;
             }
 
@@ -67,7 +73,17 @@ class EpiDueService
                 ? $this->maternalAnchor($item, $administeredDates, $anchorDate)
                 : $childDob;
 
-            if ($anchor === null || $this->dueDateFor($anchor, $item)->isAfter($now)) {
+            if ($anchor === null) {
+                $this->lastGenerationReport['skipped_dependency']++;
+
+                continue;
+            }
+
+            $dueDate = $this->dueDateFor($anchor, $item);
+
+            if ($dueDate->isAfter($now)) {
+                $this->lastGenerationReport['skipped_future']++;
+
                 continue;
             }
 
@@ -77,7 +93,9 @@ class EpiDueService
                 'vaccine_id' => $item->vaccine_id,
                 'dose_sequence' => $item->dose_sequence,
                 'status' => ImmunizationStatus::SCHEDULED,
+                'due_date' => $dueDate->toDateString(),
             ]);
+            $this->lastGenerationReport['created']++;
 
             $record->setRelation('vaccine', $item->vaccine);
             $this->appointmentScheduler->schedule($record);
@@ -87,6 +105,47 @@ class EpiDueService
         }
 
         return $records;
+    }
+
+    /**
+     * Why the last generateDueRecords() call created or skipped doses.
+     *
+     * @return array{created: int, skipped_future: int, skipped_dependency: int, skipped_existing: int}
+     */
+    public function lastGenerationReport(): array
+    {
+        return $this->lastGenerationReport;
+    }
+
+    /**
+     * Classify a scheduled record relative to today, preferring its stored
+     * due date and falling back to the anchor-based computation for rows
+     * created before due dates were persisted.
+     *
+     * @return 'not_yet_due'|'due'|'overdue'
+     */
+    public function classifyRecord(ImmunizationRecord $record, ImmunizationScheduleItem $item, ?Carbon $anchorDate): string
+    {
+        if ($record->due_date === null) {
+            return $anchorDate === null ? 'due' : $this->classifyScheduledDose($anchorDate, $item);
+        }
+
+        $dueDate = $record->due_date->copy()->startOfDay();
+        $today = Carbon::today();
+
+        if ($dueDate->isAfter($today)) {
+            return 'not_yet_due';
+        }
+
+        if ($item->maximum_age_days !== null) {
+            $windowEnd = $dueDate->copy()->addDays((int) $item->maximum_age_days - (int) $item->minimum_age_days);
+
+            if ($today->gt($windowEnd)) {
+                return 'overdue';
+            }
+        }
+
+        return 'due';
     }
 
     /**

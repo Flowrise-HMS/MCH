@@ -200,6 +200,57 @@ class EpiDueServiceTest extends TestCase
         $this->assertCount(1, $second);
         $this->assertSame(2, $second->first()->dose_sequence);
         $this->assertSame(0, ImmunizationRecord::query()->where('patient_id', $mother->id)->where('dose_sequence', 3)->count());
+        // TT2 is due 28 days after TT1 was administered (30 days ago).
+        $this->assertSame(now()->subDays(2)->toDateString(), $second->first()->due_date->toDateString());
+        $this->assertSame(1, $service->lastGenerationReport()['skipped_dependency']);
+    }
+
+    public function test_persists_due_dates_and_reports_skipped_doses(): void
+    {
+        $schedule = $this->setupSchedule();
+        $branch = Branch::factory()->create();
+        $newborn = Patient::factory()->create([
+            'branch_id' => $branch->id,
+            'date_of_birth' => now()->subDays(10)->toDateString(),
+        ]);
+
+        $created = app(EpiDueService::class)->generateDueRecords($newborn, $schedule, $branch->id);
+
+        $this->assertCount(1, $created);
+        $this->assertSame($newborn->date_of_birth->toDateString(), $created->first()->due_date->toDateString());
+
+        $report = app(EpiDueService::class)->lastGenerationReport();
+        $this->assertSame(1, $report['created']);
+        $this->assertSame(1, $report['skipped_future']);
+    }
+
+    public function test_classify_record_prefers_the_stored_due_date(): void
+    {
+        $schedule = $this->setupSchedule();
+        $branch = Branch::factory()->create();
+        $child = Patient::factory()->create(['branch_id' => $branch->id, 'date_of_birth' => now()->subDays(100)->toDateString()]);
+        $opvItem = $schedule->items()->where('minimum_age_days', 42)->first();
+        $opvItem->update(['maximum_age_days' => 56]);
+
+        $record = ImmunizationRecord::create([
+            'patient_id' => $child->id,
+            'branch_id' => $branch->id,
+            'vaccine_id' => $opvItem->vaccine_id,
+            'dose_sequence' => 1,
+            'status' => ImmunizationStatus::SCHEDULED,
+            'due_date' => now()->addDays(3)->toDateString(),
+        ]);
+
+        $service = app(EpiDueService::class);
+
+        // Stored due date wins over the DOB-based computation (which would be overdue).
+        $this->assertSame('not_yet_due', $service->classifyRecord($record, $opvItem->fresh(), $service->getDateOfBirth($child)));
+
+        $record->update(['due_date' => now()->subDays(30)->toDateString()]);
+        $this->assertSame('overdue', $service->classifyRecord($record->fresh(), $opvItem->fresh(), $service->getDateOfBirth($child)));
+
+        $record->update(['due_date' => now()->subDays(5)->toDateString()]);
+        $this->assertSame('due', $service->classifyRecord($record->fresh(), $opvItem->fresh(), $service->getDateOfBirth($child)));
     }
 
     public function test_classify_scheduled_dose_matches_classify_dose_without_querying(): void

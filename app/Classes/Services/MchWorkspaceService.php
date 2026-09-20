@@ -128,7 +128,7 @@ class MchWorkspaceService
     }
 
     /**
-     * @return Collection<int, array{patient: Patient, overdue: bool, scheduled_count: int}>
+     * @return Collection<int, array{patient: Patient, overdue: bool, scheduled_count: int, next_due_date: ?Carbon}>
      */
     public function epiDuePatients(string $branchId): Collection
     {
@@ -157,6 +157,7 @@ class MchWorkspaceService
             ->with(['patient', 'vaccine'])
             ->where('branch_id', $branchId)
             ->where('status', ImmunizationStatus::SCHEDULED)
+            ->orderBy('due_date')
             ->get();
 
         $grouped = [];
@@ -164,17 +165,21 @@ class MchWorkspaceService
         foreach ($records as $record) {
             $entry = $itemsByKey[$record->vaccine_id.'|'.$record->dose_sequence] ?? null;
 
-            if ($entry === null || $record->patient === null || $record->patient->date_of_birth === null) {
+            if ($entry === null || $record->patient === null) {
                 continue;
             }
 
-            // Maternal doses are only generated once due, so a SCHEDULED row is due by construction.
-            $classification = $entry['maternal']
-                ? 'due'
-                : $this->epiDueService->classifyScheduledDose(
-                    $this->epiDueService->getDateOfBirth($record->patient),
-                    $entry['item'],
-                );
+            // Child doses are anchored on the date of birth; maternal doses are
+            // only generated once due, so without a stored due date they count as due.
+            $anchor = ! $entry['maternal'] && $record->patient->date_of_birth !== null
+                ? $this->epiDueService->getDateOfBirth($record->patient)
+                : null;
+
+            if (! $entry['maternal'] && $anchor === null && $record->due_date === null) {
+                continue;
+            }
+
+            $classification = $this->epiDueService->classifyRecord($record, $entry['item'], $anchor);
 
             if (! in_array($classification, ['due', 'overdue'], true)) {
                 continue;
@@ -187,6 +192,7 @@ class MchWorkspaceService
                     'patient' => $record->patient,
                     'overdue' => false,
                     'scheduled_count' => 0,
+                    'next_due_date' => null,
                 ];
             }
 
@@ -194,6 +200,13 @@ class MchWorkspaceService
 
             if ($classification === 'overdue') {
                 $grouped[$patientId]['overdue'] = true;
+            }
+
+            $dueDate = $record->due_date?->copy()->startOfDay();
+            $current = $grouped[$patientId]['next_due_date'];
+
+            if ($dueDate !== null && ($current === null || $dueDate->lt($current))) {
+                $grouped[$patientId]['next_due_date'] = $dueDate;
             }
         }
 

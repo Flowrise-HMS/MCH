@@ -332,12 +332,52 @@ class MchWorkspaceActionsTest extends TestCase
             ->call('generateEpiDues');
 
         $this->assertContains('immunizations', $component->instance()->availableTabs());
+        $component->assertNotified('TT dues generated');
         $this->assertDatabaseHas('immunization_records', [
             'patient_id' => $mother->id,
             'vaccine_id' => $tt->id,
             'dose_sequence' => 1,
             'status' => ImmunizationStatus::SCHEDULED->value,
+            'due_date' => now()->subDays(10)->toDateString(),
         ]);
+    }
+
+    public function test_generate_tt_dues_warns_when_the_mother_has_no_active_pregnancy(): void
+    {
+        $mother = Patient::factory()->female()->create(['branch_id' => $this->branch->id]);
+
+        Livewire::test(MchWorkspace::class)
+            ->call('selectPatient', $mother->id)
+            ->call('generateEpiDues')
+            ->assertNotified('No active pregnancy or child health record');
+
+        $this->assertSame(0, ImmunizationRecord::query()->where('patient_id', $mother->id)->count());
+    }
+
+    public function test_generate_tt_dues_explains_why_nothing_was_scheduled(): void
+    {
+        $mother = Patient::factory()->female()->create(['branch_id' => $this->branch->id]);
+        PregnancyEpisode::factory()->create([
+            'patient_id' => $mother->id,
+            'branch_id' => $this->branch->id,
+            'booking_date' => now()->addDays(5)->toDateString(),
+        ]);
+        $tt = Vaccine::create(['antigen' => VaccineAntigen::TETANUS_TOXOID, 'name' => 'TT']);
+        $schedule = ImmunizationSchedule::create([
+            'name' => 'Future TT',
+            'target_population' => ImmunizationSchedule::TARGET_MATERNAL,
+        ]);
+        ImmunizationScheduleItem::create([
+            'immunization_schedule_id' => $schedule->id,
+            'vaccine_id' => $tt->id,
+            'dose_sequence' => 1,
+            'minimum_age_days' => 0,
+        ]);
+
+        Livewire::test(MchWorkspace::class)
+            ->call('selectPatient', $mother->id)
+            ->call('generateEpiDues')
+            ->assertNotified('No new doses scheduled');
     }
 
     public function test_record_outcome_closes_active_pregnancy(): void
