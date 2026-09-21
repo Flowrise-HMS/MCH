@@ -137,15 +137,7 @@ class EpiDueService
             return 'not_yet_due';
         }
 
-        if ($item->maximum_age_days !== null) {
-            $windowEnd = $dueDate->copy()->addDays((int) $item->maximum_age_days - (int) $item->minimum_age_days);
-
-            if ($today->gt($windowEnd)) {
-                return 'overdue';
-            }
-        }
-
-        return 'due';
+        return $today->gt($this->windowEndFor($dueDate, $item)) ? 'overdue' : 'due';
     }
 
     /**
@@ -185,15 +177,22 @@ class EpiDueService
             return 'not_yet_due';
         }
 
-        if ($item->maximum_age_days !== null) {
-            $windowEnd = $anchorDate->copy()->addDays((int) $item->maximum_age_days);
+        return $today->gt($this->windowEndFor($dueDate, $item)) ? 'overdue' : 'due';
+    }
 
-            if ($today->gt($windowEnd)) {
-                return 'overdue';
-            }
+    /**
+     * Last day a dose is merely "due": the schedule item's maximum age when it
+     * has one, otherwise the due date plus the configured grace period.
+     */
+    protected function windowEndFor(Carbon $dueDate, ImmunizationScheduleItem $item): Carbon
+    {
+        if ($item->maximum_age_days !== null) {
+            $window = max(0, (int) $item->maximum_age_days - (int) $item->minimum_age_days);
+
+            return $dueDate->copy()->addDays($window);
         }
 
-        return 'due';
+        return $dueDate->copy()->addDays(max(0, (int) config('mch.epi_dues.overdue_after_days', 28)));
     }
 
     public function dueDateFor(Carbon $anchorDate, ImmunizationScheduleItem $item): Carbon

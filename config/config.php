@@ -20,4 +20,12 @@ return [
         'start_minute' => (int) env('MCH_EPI_APPOINTMENT_START_MINUTE', 0),
         'duration_minutes' => (int) env('MCH_EPI_APPOINTMENT_DURATION_MINUTES', 30),
     ],
+
+    'epi_dues' => [
+        /*
+         * A scheduled dose whose schedule item has no maximum_age_days counts
+         * as overdue once it is this many days past its due date.
+         */
+        'overdue_after_days' => (int) env('MCH_EPI_OVERDUE_AFTER_DAYS', 28),
+    ],
 ];

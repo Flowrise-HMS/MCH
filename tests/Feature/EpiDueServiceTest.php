@@ -148,8 +148,17 @@ class EpiDueServiceTest extends TestCase
 
         $service = app(EpiDueService::class);
 
-        $this->assertSame('due', $service->classifyDose($child, $bcgItem));
+        // BCG has no maximum age: 50 days past its birth due date exceeds the
+        // configured 28-day grace period, so it is overdue too.
+        $this->assertSame('overdue', $service->classifyDose($child, $bcgItem));
         $this->assertSame('overdue', $service->classifyDose($child, $opvItem));
+
+        $tenDaysOld = Patient::factory()->child()->create([
+            'branch_id' => $branch->id,
+            'date_of_birth' => now()->subDays(10),
+        ]);
+
+        $this->assertSame('due', $service->classifyDose($tenDaysOld, $bcgItem));
 
         $newborn = Patient::factory()->child()->create([
             'branch_id' => $branch->id,
@@ -262,7 +271,10 @@ class EpiDueServiceTest extends TestCase
             'date_of_birth' => now()->subDays(50),
         ]);
 
+        // Explicit windows so the grace-period default does not apply:
+        // BCG is still open at 50 days, OPV (due at 42 days) closed at 45.
         $bcgItem = $schedule->items()->whereHas('vaccine', fn ($query) => $query->where('antigen', VaccineAntigen::BCG))->firstOrFail();
+        $bcgItem->forceFill(['maximum_age_days' => 365])->save();
         $opvItem = $schedule->items()->whereHas('vaccine', fn ($query) => $query->where('antigen', VaccineAntigen::OPV))->firstOrFail();
         $opvItem->forceFill(['maximum_age_days' => 45])->save();
 

@@ -4,6 +4,7 @@ namespace Modules\MCH\Filament\Widgets;
 
 use Filament\Widgets\TableWidget as BaseTableWidget;
 use Illuminate\Database\Eloquent\Builder;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Reactive;
 use Modules\MCH\Filament\Clusters\MCH\Resources\ChildVisitAssessments\Tables\ChildVisitAssessmentsTable;
 use Modules\MCH\Models\ChildVisitAssessment;
@@ -18,6 +19,13 @@ class PatientChildVisitsWidget extends BaseTableWidget
 
     #[Reactive]
     public ?string $patientId = null;
+
+    /**
+     * Re-render after the workspace saves a visit, dose or measurement so the
+     * history below the form reflects it without a page reload.
+     */
+    #[On('mch-patient-data-updated')]
+    public function refreshFromWorkspace(): void {}
 
     protected function getTableQuery(): Builder
     {

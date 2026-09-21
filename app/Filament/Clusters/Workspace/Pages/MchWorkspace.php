@@ -359,6 +359,7 @@ class MchWorkspace extends Page
             Notification::make()->title('ANC visit saved')->success()->send();
             $this->ancVisitForm->fill();
             $this->activeTab = 'overview';
+            $this->dispatch('mch-patient-data-updated');
         } catch (Throwable $e) {
             Notification::make()->title('ANC visit failed')->body($e->getMessage())->danger()->send();
         }
@@ -402,6 +403,7 @@ class MchWorkspace extends Page
             Notification::make()->title('CWC visit saved')->success()->send();
             $this->cwcVisitForm->fill();
             $this->activeTab = 'overview';
+            $this->dispatch('mch-patient-data-updated');
         } catch (Throwable $e) {
             Notification::make()->title('CWC visit failed')->body($e->getMessage())->danger()->send();
         }
@@ -431,7 +433,9 @@ class MchWorkspace extends Page
         if ($schedule === null) {
             Notification::make()
                 ->title($isMother ? 'No active maternal TT schedule' : 'No active child EPI schedule')
+                ->body('Create one under Patient Care → MCH → EPI schedules, or run php artisan module:seed MCH to load the Ghana EPI and maternal TT schedules.')
                 ->warning()
+                ->persistent()
                 ->send();
 
             return;
@@ -468,6 +472,7 @@ class MchWorkspace extends Page
             ->body($created->count().' scheduled dose(s).')
             ->success()
             ->send();
+        $this->dispatch('mch-patient-data-updated');
     }
 
     public function administerDose(string $recordId): void
@@ -481,6 +486,7 @@ class MchWorkspace extends Page
             ]);
             $this->administerBatchLot = '';
             Notification::make()->title('Dose administered')->success()->send();
+            $this->dispatch('mch-patient-data-updated');
         } catch (Throwable $e) {
             Notification::make()->title('Administer failed')->body($e->getMessage())->danger()->send();
         }
