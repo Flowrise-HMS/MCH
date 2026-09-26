@@ -14,14 +14,10 @@
                     @if (strlen($searchTerm) >= 2 && count($searchResults) > 0)
                         <div class="absolute z-50 mt-1 w-full rounded-xl border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
                             @foreach ($searchResults as $result)
-                                <button
-                                    type="button"
-                                    wire:click="selectPatient('{{ $result['id'] }}')"
-                                    class="block w-full border-b border-gray-100 px-4 py-3 text-left last:border-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800"
-                                >
+                                <x-core::patient-link :href="$this::getUrl(['patientId' => $result['id']])" class="block w-full border-b border-gray-100 px-4 py-3 text-left last:border-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800">
                                     <div class="font-medium text-gray-950 dark:text-white">{{ $result['full_name'] }}</div>
                                     <div class="text-sm text-gray-500">MRN: {{ $result['mrn'] ?? '—' }}</div>
-                                </button>
+                                </x-core::patient-link>
                             @endforeach
                         </div>
                     @endif
@@ -53,7 +49,7 @@
                         @forelse ($this->ancToday() as $patient)
                             @php($pregnancy = $patient->activePregnancyEpisode)
                             <li>
-                                <button type="button" wire:click="selectPatient('{{ $patient->id }}')" class="w-full px-1 py-2 text-left hover:text-primary-600">
+                                <x-core::patient-link :href="$this::getUrl(['patientId' => $patient->id])" class="block w-full px-1 py-2 text-left hover:text-primary-600">
                                     {{ $patient->full_name }}
                                     @if ($pregnancy)
                                         <span class="block text-xs text-gray-500">
@@ -66,7 +62,7 @@
                                             @endif
                                         </span>
                                     @endif
-                                </button>
+                                </x-core::patient-link>
                             </li>
                         @empty
                             <li class="text-sm text-gray-500">No ANC returns or open antenatal encounters today.</li>
@@ -79,9 +75,9 @@
                     <ul class="divide-y divide-gray-100 dark:divide-gray-800">
                         @forelse ($this->cwcToday() as $patient)
                             <li>
-                                <button type="button" wire:click="selectPatient('{{ $patient->id }}')" class="w-full px-1 py-2 text-left hover:text-primary-600">
+                                <x-core::patient-link :href="$this::getUrl(['patientId' => $patient->id])" class="block w-full px-1 py-2 text-left hover:text-primary-600">
                                     {{ $patient->full_name }}
-                                </button>
+                                </x-core::patient-link>
                             </li>
                         @empty
                             <li class="text-sm text-gray-500">No open child welfare encounters today.</li>
@@ -94,12 +90,12 @@
                     <ul class="divide-y divide-gray-100 dark:divide-gray-800">
                         @forelse ($this->epiDue() as $row)
                             <li>
-                                <button type="button" wire:click="selectPatient('{{ $row['patient']->id }}')" class="w-full px-1 py-2 text-left hover:text-primary-600">
+                                <x-core::patient-link :href="$this::getUrl(['patientId' => $row['patient']->id])" class="block w-full px-1 py-2 text-left hover:text-primary-600">
                                     {{ $row['patient']->full_name }}
                                     <span class="text-xs {{ $row['overdue'] ? 'text-danger-600' : 'text-gray-500' }}">
                                         {{ $row['overdue'] ? 'overdue' : 'due' }} · {{ $row['scheduled_count'] }}@if (! empty($row['next_due_date'])) · due {{ $row['next_due_date']->format('d M Y') }}@endif
                                     </span>
-                                </button>
+                                </x-core::patient-link>
                             </li>
                         @empty
                             <li class="text-sm text-gray-500">No scheduled dues. Open a child and generate EPI dues.</li>
@@ -114,10 +110,10 @@
                     <ul class="divide-y divide-gray-100 dark:divide-gray-800">
                         @forelse ($this->eddDueSoon() as $episode)
                             <li>
-                                <button type="button" wire:click="selectPatient('{{ $episode->patient_id }}')" class="w-full px-1 py-2 text-left hover:text-primary-600">
+                                <x-core::patient-link :href="$this::getUrl(['patientId' => $episode->patient_id])" class="block w-full px-1 py-2 text-left hover:text-primary-600">
                                     {{ $episode->patient?->full_name ?? 'Patient' }}
                                     <span class="block text-xs text-gray-500">EDD {{ optional($episode->edd)->toDateString() }}</span>
-                                </button>
+                                </x-core::patient-link>
                             </li>
                         @empty
                             <li class="text-sm text-gray-500">No deliveries expected in the next two weeks.</li>
@@ -130,10 +126,10 @@
                     <ul class="divide-y divide-gray-100 dark:divide-gray-800">
                         @forelse ($this->highRisk() as $episode)
                             <li>
-                                <button type="button" wire:click="selectPatient('{{ $episode->patient_id }}')" class="w-full px-1 py-2 text-left hover:text-primary-600">
+                                <x-core::patient-link :href="$this::getUrl(['patientId' => $episode->patient_id])" class="block w-full px-1 py-2 text-left hover:text-primary-600">
                                     {{ $episode->patient?->full_name ?? 'Patient' }}
                                     <span class="text-xs text-danger-600">high risk</span>
-                                </button>
+                                </x-core::patient-link>
                             </li>
                         @empty
                             <li class="text-sm text-gray-500">None listed.</li>
@@ -157,9 +153,9 @@
                     <ul class="divide-y divide-gray-100 dark:divide-gray-800">
                         @forelse ($this->recentPatients() as $patient)
                             <li>
-                                <button type="button" wire:click="selectPatient('{{ $patient->id }}')" class="w-full px-1 py-2 text-left hover:text-primary-600">
+                                <x-core::patient-link :href="$this::getUrl(['patientId' => $patient->id])" class="block w-full px-1 py-2 text-left hover:text-primary-600">
                                     {{ $patient->full_name }}
-                                </button>
+                                </x-core::patient-link>
                             </li>
                         @empty
                             <li class="text-sm text-gray-500">No recent patients.</li>

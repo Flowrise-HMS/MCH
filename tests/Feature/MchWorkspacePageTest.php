@@ -114,4 +114,33 @@ class MchWorkspacePageTest extends TestCase
         Livewire::test(MchWorkspace::class)
             ->assertForbidden();
     }
+
+    public function test_search_results_link_to_the_patient_instead_of_a_livewire_call(): void
+    {
+        Gate::before(fn (): bool => true);
+        $this->actingAs(User::factory()->create());
+        Filament::setCurrentPanel(Filament::getDefaultPanel());
+
+        $mother = Patient::factory()->female()->create(['branch_id' => $this->branch->id]);
+
+        Livewire::test(MchWorkspace::class)
+            ->set('searchTerm', $mother->first_name)
+            ->assertSee($mother->full_name)
+            ->assertSeeHtml('href="'.e(MchWorkspace::getUrl(['patientId' => $mother->id])).'"')
+            ->assertDontSeeHtml("wire:click=\"selectPatient('{$mother->id}')\"");
+    }
+
+    public function test_patient_url_opens_the_workspace_on_that_patient(): void
+    {
+        Gate::before(fn (): bool => true);
+        $this->actingAs(User::factory()->create());
+        Filament::setCurrentPanel(Filament::getDefaultPanel());
+
+        $mother = Patient::factory()->female()->create(['branch_id' => $this->branch->id]);
+
+        Livewire::withQueryParams(['patientId' => $mother->id])
+            ->test(MchWorkspace::class)
+            ->assertSet('mode', 'patient')
+            ->assertSet('patientId', $mother->id);
+    }
 }
