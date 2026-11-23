@@ -104,6 +104,34 @@ class MchWorkspacePageTest extends TestCase
         $settings->save();
     }
 
+    public function test_direct_access_forbidden_when_feature_flag_disabled(): void
+    {
+        $this->artisan('migrate', [
+            '--path' => base_path('Modules/Core/database/settings'),
+            '--realpath' => true,
+            '--force' => true,
+            '--no-interaction' => true,
+        ]);
+
+        Gate::before(fn (): bool => true);
+        $this->actingAs(User::factory()->create());
+        Filament::setCurrentPanel(Filament::getDefaultPanel());
+
+        $settings = app(FeatureSettings::class);
+        $settings->mch_workspace_enabled = false;
+        $settings->save();
+
+        try {
+            $this->assertFalse(MchWorkspace::canAccess());
+            Livewire::test(MchWorkspace::class)->assertForbidden();
+        } finally {
+            $settings->mch_workspace_enabled = true;
+            $settings->save();
+        }
+
+        $this->assertTrue(MchWorkspace::canAccess());
+    }
+
     public function test_page_requires_shield_permission(): void
     {
         Permission::findOrCreate('View MchWorkspace', 'web');

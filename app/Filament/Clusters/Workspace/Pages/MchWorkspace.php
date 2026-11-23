@@ -59,7 +59,9 @@ use Throwable;
 
 class MchWorkspace extends Page
 {
-    use HasPageShield;
+    use HasPageShield {
+        canAccess as shieldCanAccess;
+    }
 
     protected static ?string $slug = '';
 
@@ -108,7 +110,21 @@ class MchWorkspace extends Page
 
     public string $declineReason = '';
 
+    /**
+     * The Features toggle blocks the page itself, not just its menu entry, so a
+     * bookmarked URL stops working once the workspace is switched off.
+     */
+    public static function canAccess(): bool
+    {
+        return static::workspaceEnabled() && static::shieldCanAccess();
+    }
+
     public static function shouldRegisterNavigation(): bool
+    {
+        return static::canAccess();
+    }
+
+    protected static function workspaceEnabled(): bool
     {
         try {
             return app(FeatureSettings::class)->mch_workspace_enabled;
