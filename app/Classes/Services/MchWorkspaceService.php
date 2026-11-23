@@ -16,6 +16,7 @@ use Modules\MCH\Enums\MchRecordStatus;
 use Modules\MCH\Enums\PregnancyOutcome;
 use Modules\MCH\Enums\RiskLevel;
 use Modules\MCH\Models\ChildHealthRecord;
+use Modules\MCH\Models\DeliveryRecord;
 use Modules\MCH\Models\ImmunizationRecord;
 use Modules\MCH\Models\ImmunizationSchedule;
 use Modules\MCH\Models\ImmunizationScheduleItem;
@@ -31,8 +32,16 @@ class MchWorkspaceService
         private EncounterService $encounterService,
     ) {}
 
+    /** Postnatal follow-up window after delivery (6 weeks + 1 week grace). */
+    public const POSTNATAL_DAYS = 49;
+
     /**
-     * @return array{kind: 'mother'|'child'|'unknown', pregnancy: ?PregnancyEpisode, childHealthRecord: ?ChildHealthRecord}
+     * - mother: active pregnancy;
+     * - postnatal: delivered within the postnatal window (PNC visits);
+     * - child: active child health record (`delivery` set when born here);
+     * - unknown: none of the above.
+     *
+     * @return array{kind: 'mother'|'postnatal'|'child'|'unknown', pregnancy: ?PregnancyEpisode, childHealthRecord: ?ChildHealthRecord, delivery?: ?DeliveryRecord}
      */
     public function resolveContext(Patient $patient): array
     {
@@ -47,6 +56,22 @@ class MchWorkspaceService
                 'kind' => 'mother',
                 'pregnancy' => $pregnancy,
                 'childHealthRecord' => null,
+                'delivery' => null,
+            ];
+        }
+
+        $recentDelivery = DeliveryRecord::query()
+            ->where('patient_id', $patient->id)
+            ->where('delivered_at', '>=', now()->subDays(self::POSTNATAL_DAYS))
+            ->latest('delivered_at')
+            ->first();
+
+        if ($recentDelivery !== null) {
+            return [
+                'kind' => 'postnatal',
+                'pregnancy' => $recentDelivery->pregnancyEpisode,
+                'childHealthRecord' => null,
+                'delivery' => $recentDelivery,
             ];
         }
 
@@ -61,6 +86,7 @@ class MchWorkspaceService
                 'kind' => 'child',
                 'pregnancy' => null,
                 'childHealthRecord' => $childRecord,
+                'delivery' => $childRecord->delivery_record_id !== null ? $childRecord->deliveryRecord : null,
             ];
         }
 
@@ -68,6 +94,7 @@ class MchWorkspaceService
             'kind' => 'unknown',
             'pregnancy' => null,
             'childHealthRecord' => null,
+            'delivery' => null,
         ];
     }
 

@@ -105,4 +105,9 @@ class PregnancyEpisode extends BaseModel implements ProvidesClientIdentity
 
         return ['weeks' => intdiv($days, 7), 'days' => $days % 7];
     }
+
+    public function deliveryRecord(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(DeliveryRecord::class);
+    }
 }

@@ -14,7 +14,7 @@ This document is the canonical guide for the module. It is meant to be useful to
 
 ## Current Status
 
-MCH-1 (registry, visits, anthropometry, books) and MCH-2 (immunization / EPI) are **complete** for operational use, together with the **MCH Workspace**.
+MCH-1 (registry, visits, anthropometry, books), MCH-2 (immunization / EPI), MCH-3 (WHO growth Z-scores) and MCH-4 (delivery, newborn registration, postnatal care) are **complete**, together with the **MCH Workspace** and data-sharing **consent enforcement**.
 
 What is available:
 
@@ -30,13 +30,10 @@ What is available:
 - FHIR `EpisodeOfCare` (read/search) and `Immunization` (read) mappings
 - a Filament **MCH** cluster in the **Patient Care** sidebar group with nine resources, plus read-only relation managers on the patient record
 - Shield policies for every resource model, seeded by `MchShieldPermissionsSeeder` (super_admin, doctor, nurse)
-
-Explicitly out of scope (deferred to later phases, not missing work):
-
-- MCH-3: WHO LMS Z-scores (`GrowthZScore` must read **only** child anthropometry rows, never `fundal_height`)
-- MCH-4: delivery records, newborn auto-registration from a delivery record, `ChildHealthRecord.delivery_record_id` FK
-- PNC (postnatal) visit assessments (postnatal encounters exist in Clinical but MCH has no PNC form)
-- consent enforcement (`data_consented` is stored, never checked); do not claim GHILMIS/school-entry compliance until a flow reads it
+- **WHO growth Z-scores (MCH-3)**: every child weight, length/height, head circumference and MUAC (0–5 years) gets its WHO Child Growth Standards Z-score (WAZ, HAZ, HCZ, ACZ) and weights get weight-for-length/height (WHZ) when a length was taken the same day; classification badges (stunted, wasted, underweight, overweight, …) and a growth chart against the −3/−2/0/+2/+3 SD curves on the workspace Growth tab
+- **Delivery and newborns (MCH-4)**: "Record delivery" closes the pregnancy (delivered / stillbirth / maternal death), stores the delivery (time, place, mode, attendant, gestation, blood loss, complications) and one row per baby (sex, outcome, birth weight, length, head circumference, APGAR); every live-born baby is registered as a patient (*Baby &lt;surname&gt;*, *Baby A/B* for multiples) with a CWC record linked to the delivery, a mother relationship, birth measurements (with Z-scores) and the birth EPI doses
+- **Postnatal care (MCH-4)**: for 49 days after delivery the mother opens in a *postnatal* context with a PNC tab; newborns from a recorded delivery get a newborn-check (PNC) tab; WHO contacts (within 24 h, day 3, days 7–14, week 6) are derived from the days since delivery
+- **Consent enforcement**: `mch_records.data_consented` gates FHIR read/search/`$export` of MCH data (and the MCH API endpoints once added) via `MchConsentGate`; clinicians are never blocked; the workspace shows a "consent not recorded" banner with **Record consent**; `mch_override_consent` bypasses the gate and `MCH_ENFORCE_CONSENT=false` disables it
 
 ## Mental Model
 
@@ -81,8 +78,11 @@ All models extend `Modules\Core\Models\BaseModel` (auditing + `BelongsToBranch`)
 | `vaccines` | Vaccine catalogue (antigen, doses, route, ...) | no |
 | `immunization_schedules`, `immunization_schedule_items` | EPI schedule definitions (child and maternal TT) | no |
 | `immunization_records` | Scheduled / administered / declined doses per patient (`due_date`, batch, lot, site, appointment link) | no |
+| `mch_delivery_records` | One delivery per pregnancy episode (mother = `patient_id`) | no |
+| `mch_newborns` | One row per baby of a delivery; `child_patient_id` for live births | no |
+| `mch_postnatal_visit_assessments` | PNC checks (mother or baby) on a postnatal encounter | no |
 
-10 migrations, 10 factories.
+`growth_measurements` also carries `z_score`, `z_indicator` (`wfa`/`lhfa`/`hcfa`/`acfa`) and `whz`. WHO LMS reference tables live in `database/data/who/` (see its README for source and licence). 13 migrations, 12 factories.
 
 ### Enums
 
@@ -105,6 +105,9 @@ Every enum implements Filament `HasLabel`, `HasColor`, and `HasDescription` (plu
 | `DevelopmentalScreen` | CWC developmental screen result |
 | `VaccineAntigen` | Vaccine catalogue antigens |
 | `ImmunizationStatus` | `scheduled`, `administered`, `declined`, `contraindicated` |
+| `GrowthIndicator` | WHO indicators (WFA, LHFA, HCFA, ACFA, WFL, WFH) with their reference files |
+| `DeliveryMode`, `DeliveryPlace`, `BirthOutcome` | Delivery register |
+| `PostnatalContact` | WHO PNC contacts (within 24 h, day 3, days 7–14, week 6, other) |
 
 ### One-active-book uniqueness (MariaDB 1901)
 
@@ -128,11 +131,15 @@ All service classes live in `Modules/MCH/app/Classes/Services` (`Modules\MCH\Cla
 | `EpiDueService` | Generates due `ImmunizationRecord` rows from the active schedules and classifies doses as due / overdue |
 | `ImmunizationRecordService` | Administers (batch/lot, site, date) or declines a dose |
 | `EpiAppointmentScheduler` | Books an Appointment for each scheduled dose via `AppointmentSchedulingService` (`mch.epi_appointments.*`; uses the stored `due_date`, overdue doses book today; a scheduling conflict skips the booking with a log entry) when the module is enabled |
-| `MchWorkspaceService` | Workspace context resolution, home dashboard queries, open-encounter lookup / creation |
+| `MchWorkspaceService` | Workspace context resolution (mother / postnatal / child / unknown), home dashboard queries, open-encounter lookup / creation |
+| `GrowthZScoreService` | WHO LMS Z-scores with the restricted method beyond ±3 SD for weight, WFL/WFH and MUAC; applied by `GrowthMeasurement` model events whoever writes the row; `mch:recompute-zscores` backfills |
+| `DeliveryRecordService` | Records a delivery and its babies in one transaction, registers live births (patient, CWC record, mother relationship, birth measurements, birth EPI doses) and closes the episode |
+| `PostnatalVisitAssessmentService` | Records a PNC check on a `POSTNATAL` encounter, deriving the contact from days since delivery |
+| `MchConsentGate` | Consent checks and query scoping for data sharing (FHIR transformers use it) |
 
 `PregnancyEpisode` still derives risk and booking GA in `saving` via `PregnancyRiskService` so Filament create/edit stay consistent without a dedicated pregnancy-create service. When `edd` is blank and `edd_source` is LMP, `saving` also derives EDD as LMP + 280 days.
 
-`EpiDueService::generateDueRecords()` anchors child doses on the date of birth and maternal TT doses on the previous administered dose (dose 1 on the ANC booking date passed as `$anchorDate`), so a maternal dose is only generated once the one before it has been given. The workspace "Record pregnancy outcome" action closes the active episode by setting `PregnancyEpisode.outcome`; delivery details remain MCH-4.
+`EpiDueService::generateDueRecords()` anchors child doses on the date of birth and maternal TT doses on the previous administered dose (dose 1 on the ANC booking date passed as `$anchorDate`), so a maternal dose is only generated once the one before it has been given. The workspace **Record delivery** action records births through `DeliveryRecordService`; **Record pregnancy outcome** remains for closing a pregnancy without a delivery (referral, loss to follow-up, death).
 
 `MchServiceProvider` resolves `pregnancyEpisodes`, `activePregnancyEpisode`, `childHealthRecord`, `immunizationRecords`, and `growthMeasurements` on `Patient` dynamically (the Clinical pattern) and registers three read-only relation managers on `PatientResource` through Core's `RelationManagersRegistry`.
 
@@ -166,17 +173,18 @@ Resources follow the Clinical nest: `Filament/Clusters/MCH/Resources/{Name}/` wi
 
 - **Home**: patient search, **Register mother** / **Register child** buttons, and cards ANC today (n), CWC today (n), EPI due / overdue (n), EDD within 14 days (n), High-risk pregnancies, Books issued today, Recent.
 - **Register mother**: sections Demographics (First name, Last name, Date of birth, Phone; gender is set to female), Booking (Gravida, Parity, LMP, EDD, Edd source LMP / Ultrasound, Multiple gestation, Booking date) and Risk (risk-factor checkboxes, Manual risk override); **Save** creates the patient and the pregnancy episode (EDD, GA and risk level derived). **Register child**: Demographics (First name, Last name, Date of birth, Gender, Phone, Mother (optional)); **Save** creates the patient, the child health record and, when a mother is chosen, the `patient_relationships` row.
-- **Patient context** (`kind` = mother or child): tabs Overview, Encounter, Anc visit / Cwc visit, Immunizations, Growth (child), Vitals, Books, History. Header: the shared Clinical patient actions (Clinical Workspace, Timeline, View Full Profile, More Actions; Medication Canvas once an encounter exists) plus **Vaccination card** for a child. **Record pregnancy outcome** sits on the mother's Overview tab (Outcome: Delivered, Referred out, Lost to follow-up, Stillbirth, Maternal death); **Issue ANC book** / **Issue CWC book** sit on the Books tab (modal with a data-consent checkbox).
+- **Patient context** (`kind` = mother, postnatal or child): tabs Overview, Encounter, Anc visit / Pnc visit / Cwc visit, Immunizations, Growth (child, with the WHO growth chart), Vitals, Books, History; newborns from a recorded delivery also get Pnc visit within 49 days of birth. A consent banner with **Record consent** shows when the client's MCH book has no data-sharing consent. The mother's Overview has **Record delivery** (delivery details and a babies repeater) next to **Record pregnancy outcome**; the postnatal Overview and Pnc visit tab have **Record postnatal visit** (newborn check for a baby). Header: the shared Clinical patient actions (Clinical Workspace, Timeline, View Full Profile, More Actions; Medication Canvas once an encounter exists) plus **Vaccination card** for a child. **Record pregnancy outcome** sits on the mother's Overview tab (Outcome: Delivered, Referred out, Lost to follow-up, Stillbirth, Maternal death); **Issue ANC book** / **Issue CWC book** sit on the Books tab (modal with a data-consent checkbox).
   - **Anc visit** form: Systolic BP, Diastolic BP, Weight, Visit number, GA weeks/days, Fetal heart rate, Presentation (Cephalic / Breech / Transverse / Oblique / Other), Edema, Urine protein, Urine glucose, Fundal height (cm), Return date, Danger signs, Drugs given, Referral required, Referral destination, Notes; **Save ANC visit** also creates the antenatal encounter (status arrived) when none is open.
   - **Cwc visit** form: Weight, Length / height, MUAC, Head circumference, Feeding (Exclusive breastfeeding / Mixed feeding / Complementary feeding / Other), Developmental screen (Normal / Concern / Referred), Vitamin A given, Dewormed, Referral required, Referral destination, Notes; **Save CWC visit**.
   - **Immunizations**: **Generate dues** (child) / **Generate TT dues** (mother) create `ImmunizationRecord` rows (with a stored `due_date`) listed as *Vaccine · dose n · Scheduled* with **Administer** / **Decline** per row; inputs "Batch/lot for administer" and "Decline reason". Generating dues also books one appointment per dose through `AppointmentSchedulingService` (09:00, 30 min) on the due date, or today when the dose is already overdue (a child registered late gets all pending doses booked for today). When nothing is created the notification says why: no active pregnancy episode (TT), the booking date is in the future, the previous dose has not been administered, or the doses already exist. The home **EPI due / overdue** list shows each patient's next due date.
-- Widgets: `PatientMaternalVisitsWidget`, `PatientChildVisitsWidget`, `PatientGrowthMeasurementsWidget`, `PatientImmunizationsWidget`.
+- Widgets: `PatientMaternalVisitsWidget`, `PatientChildVisitsWidget`, `PatientGrowthMeasurementsWidget` (Z-score and WHZ badges), `PatientGrowthChartWidget`, `PatientPostnatalVisitsWidget`, `PatientImmunizationsWidget`.
+- Registers (read-only, under Patient Care → MCH): **Deliveries** (with babies) and **PNC visits**.
 
 ### Permissions
 
 Each model has a Shield-style policy registered from `MchServiceProvider` (`ViewAny PregnancyEpisode`, `Create MaternalVisitAssessment`, …). `MchShieldPermissionsSeeder` (run by `module:seed MCH` / `composer setup`) creates `View MchCluster`, `View MchWorkspace`, `View VaccinationCard` and the model abilities for all nine models and grants them to `super_admin`, `doctor` and `nurse`; other roles need the permissions assigned in Shield.
 
-`data_consented` is a stored flag only; the workspace book action asks for it with a checkbox but no flow enforces it. The printable `VaccinationCard` page requires `View VaccinationCard` and lists every active child-schedule dose with its due/overdue classification.
+`data_consented` is enforced for data sharing by `MchConsentGate` (FHIR EpisodeOfCare/Immunization read, search and `$export` only return consented patients); grant `mch_override_consent` to integration users who must see everything. `DeliveryRecord` and `PostnatalVisitAssessment` have their own Shield policies. The printable `VaccinationCard` page requires `View VaccinationCard` and lists every active child-schedule dose with its due/overdue classification.
 
 ## Administrator Guide
 
@@ -189,7 +197,7 @@ Each model has a Shield-style policy registered from `MchServiceProvider` (`View
 6. Issue an MCH book from the workspace Books tab or Patient Care → MCH → MCH books (serials are per branch)
 ```
 
-Configuration (`config/config.php`, env-overridable): `MCH_ANC_RETURN_TIMEZONE`, `MCH_ANC_RETURN_INTERVAL_WEEKS` (4), `MCH_ANC_RETURN_OCCURRENCES` (8), `MCH_ANC_RETURN_START_HOUR` (9), `MCH_ANC_RETURN_START_MINUTE`, `MCH_ANC_RETURN_DURATION_MINUTES` (30), `MCH_EPI_APPOINTMENT_START_HOUR` (9), `MCH_EPI_APPOINTMENT_START_MINUTE`, `MCH_EPI_APPOINTMENT_DURATION_MINUTES` (30). There is no MCH settings page and no scheduled command.
+Configuration (`config/config.php`, env-overridable): `MCH_ANC_RETURN_TIMEZONE`, `MCH_ANC_RETURN_INTERVAL_WEEKS` (4), `MCH_ANC_RETURN_OCCURRENCES` (8), `MCH_ANC_RETURN_START_HOUR` (9), `MCH_ANC_RETURN_START_MINUTE`, `MCH_ANC_RETURN_DURATION_MINUTES` (30), `MCH_EPI_APPOINTMENT_START_HOUR` (9), `MCH_EPI_APPOINTMENT_START_MINUTE`, `MCH_EPI_APPOINTMENT_DURATION_MINUTES` (30). `MCH_ENFORCE_CONSENT` (true). There is no MCH settings page and no scheduled command; `php artisan mch:recompute-zscores [--patient=]` backfills growth Z-scores (run once after upgrading).
 
 Useful commands:
 
@@ -205,7 +213,7 @@ php artisan test --compact Modules/MCH/tests
 - Hard requires: Core, Patient, Clinical (`module.json`).
 - Soft peer: Appointment (`AncReturnScheduler`, `EpiAppointmentScheduler` + Core `OptionalClass` / ownership test).
 - `patient_relationships` lives in Patient; the workspace fills it (mother link) when a child is registered with a mother.
-- `ChildHealthRecord.delivery_record_id` has no FK until MCH-4.
+- `ChildHealthRecord.delivery_record_id` references `mch_delivery_records` (null on delete).
 
 ### Key classes
 
@@ -216,7 +224,8 @@ php artisan test --compact Modules/MCH/tests
 | `Filament\MCHPlugin` | Module Filament plugin |
 | `Filament\Clusters\MCH\MchCluster`, `Filament\Clusters\Workspace\MchWorkspaceCluster` | Patient Care → MCH cluster; Workspaces → MCH Workspace |
 | `Filament\RelationManagers\Patient\*` | **Pregnancies**, **Immunizations** and **Growth measurements** tabs on the patient record (registered through Core's `RelationManagersRegistry`) |
-| `Policies\*` | Shield model policies (9) |
+| `Policies\*` | Shield model policies (11) |
+| `Classes\Support\WhoGrowthReference` | Loads the WHO LMS tables once per process |
 
 ### Providers
 
@@ -226,7 +235,7 @@ php artisan test --compact Modules/MCH/tests
 
 ### Tests
 
-25 test files under `Modules/MCH/tests` cover registry, visits, books, immunizations, the workspace, FHIR transforms, ANC/EPI scheduling, and module conventions (enum contracts, service path, clustered resources, policies).
+37 test files under `Modules/MCH/tests` cover registry, visits, books, immunizations, the workspace, FHIR transforms, ANC/EPI scheduling, WHO Z-scores (checked against WHO's expanded tables), delivery/newborn registration and PNC, consent enforcement, and module conventions (enum contracts, service path, clustered resources, policies).
 
 ```bash
 php artisan test --compact Modules/MCH/tests
@@ -250,4 +259,4 @@ php artisan test --compact Modules/MCH/tests
 2. Enums implement Filament `HasLabel`, `HasColor`, and `HasDescription`.
 3. Visit and book writes go through services; the Filament cluster is the operator UI.
 4. One-active-book uniqueness is a transaction + row lock, not a generated column.
-5. MCH-3/4 must not rebuild registry, assessments, anthropometry storage, immunization records, or book issuance.
+5. Extensions must not rebuild registry, assessments, anthropometry storage, immunization records, book issuance, deliveries or the Z-score service.

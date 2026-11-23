@@ -190,6 +190,8 @@
                                     @endif
                                     · {{ $context['pregnancy']->risk_level?->getLabel() }}
                                 @endif
+                            @elseif ($context['kind'] === 'postnatal')
+                                Postnatal · delivered {{ optional($context['delivery']?->delivered_at)->toDateString() ?? '—' }}
                             @elseif ($context['kind'] === 'child')
                                 Child (CWC)
                             @else
@@ -207,6 +209,13 @@
                         <x-filament::button color="gray" wire:click="clearPatient">Clear</x-filament::button>
                     </div>
                 </div>
+
+                @if ($this->bookAwaitingConsent())
+                    <div class="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-warning-300 bg-warning-50 px-3 py-2 text-sm text-warning-800 dark:border-warning-700 dark:bg-warning-950 dark:text-warning-200">
+                        <span>Data-sharing consent not recorded: this client's MCH data is excluded from FHIR, API and reporting exchange. Care is not affected.</span>
+                        {{ $this->recordConsentAction }}
+                    </div>
+                @endif
 
                 <div class="mt-4 flex flex-wrap gap-2">
                     @foreach ($this->availableTabs() as $tab)
@@ -231,8 +240,20 @@
                         </div>
                     @elseif ($context['kind'] === 'mother')
                         <p class="text-sm">Active pregnancy · risk {{ $context['pregnancy']?->risk_level?->getLabel() ?? '—' }}</p>
-                        <div class="mt-3">
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            {{ $this->recordDeliveryAction }}
                             {{ $this->recordOutcomeAction }}
+                        </div>
+                    @elseif ($context['kind'] === 'postnatal')
+                        @php($delivery = $context['delivery'])
+                        <p class="text-sm">
+                            Delivered {{ optional($delivery?->delivered_at)->format('Y-m-d H:i') }}
+                            · {{ $delivery?->mode?->getLabel() }}
+                            · {{ $delivery?->number_of_babies }} {{ \Illuminate\Support\Str::plural('baby', $delivery?->number_of_babies ?? 1) }}
+                            · day {{ $delivery ? (int) $delivery->delivered_at->copy()->startOfDay()->diffInDays(now()->startOfDay()) : '—' }} postpartum
+                        </p>
+                        <div class="mt-3">
+                            {{ $this->recordPostnatalVisitAction }}
                         </div>
                     @else
                         <p class="text-sm">CWC enrolled · generate EPI dues from the Immunizations tab when needed.</p>
@@ -248,6 +269,11 @@
                     <div class="mt-4">
                         <x-filament::button wire:click="saveAncVisit">Save ANC visit</x-filament::button>
                     </div>
+                @elseif ($activeTab === 'pnc-visit')
+                    <p class="mb-3 text-sm text-gray-600 dark:text-gray-300">
+                        WHO postnatal contacts: within 24 hours, day 3, days 7–14 and week 6. The contact is derived from the days since delivery unless chosen. Visits are listed below.
+                    </p>
+                    {{ $this->recordPostnatalVisitAction }}
                 @elseif ($activeTab === 'cwc-visit')
                     {{ $this->cwcVisitForm }}
                     <div class="mt-4">
@@ -256,7 +282,7 @@
                 @elseif ($activeTab === 'immunizations')
                     <div class="mb-4 flex flex-wrap gap-2">
                         <x-filament::button wire:click="generateEpiDues">
-                            {{ $context['kind'] === 'mother' ? 'Generate TT dues' : 'Generate dues' }}
+                            {{ in_array($context['kind'], ['mother', 'postnatal'], true) ? 'Generate TT dues' : 'Generate dues' }}
                         </x-filament::button>
                         <x-filament::input.wrapper>
                             <x-filament::input type="text" wire:model="administerBatchLot" placeholder="Batch/lot for administer" />
@@ -284,9 +310,10 @@
                     </ul>
                     <p class="text-xs text-gray-500">Full immunization table appears below with other recorded data.</p>
                 @elseif ($activeTab === 'growth')
-                    <p class="text-sm text-gray-600 dark:text-gray-300">
-                        Growth measurements captured on CWC visits are listed in the Growth measurements table below.
+                    <p class="mb-3 text-sm text-gray-600 dark:text-gray-300">
+                        Measurements from CWC visits are plotted against the WHO Child Growth Standards; Z-scores (WAZ, HAZ, HCZ, ACZ and weight-for-length/height) are listed in the Growth measurements table below.
                     </p>
+                    @livewire(\Modules\MCH\Filament\Widgets\PatientGrowthChartWidget::class, ['patientId' => $this->currentPatient?->id], key('mch-growth-chart-'.$this->currentPatient?->id))
                 @elseif ($activeTab === 'books')
                     <div class="flex gap-2">
                         {{ $this->issueBookAction }}

@@ -53,6 +53,10 @@ class MchServiceProvider extends ModuleServiceProvider
     {
         parent::boot();
 
+        $this->commands([
+            \Modules\MCH\Console\Commands\RecomputeGrowthZScoresCommand::class,
+        ]);
+
         $this->registerPolicies();
         $this->registerServices();
         $this->registerPatientRelations();
@@ -70,6 +74,8 @@ class MchServiceProvider extends ModuleServiceProvider
         Gate::policy(Vaccine::class, VaccinePolicy::class);
         Gate::policy(ImmunizationSchedule::class, ImmunizationSchedulePolicy::class);
         Gate::policy(ImmunizationRecord::class, ImmunizationRecordPolicy::class);
+        Gate::policy(\Modules\MCH\Models\DeliveryRecord::class, \Modules\MCH\Policies\DeliveryRecordPolicy::class);
+        Gate::policy(\Modules\MCH\Models\PostnatalVisitAssessment::class, \Modules\MCH\Policies\PostnatalVisitAssessmentPolicy::class);
     }
 
     protected function registerServices(): void
@@ -83,6 +89,8 @@ class MchServiceProvider extends ModuleServiceProvider
         $this->app->singleton(EpiDueService::class);
         $this->app->singleton(EpiAppointmentScheduler::class);
         $this->app->singleton(MchWorkspaceService::class);
+        $this->app->singleton(\Modules\MCH\Classes\Services\GrowthZScoreService::class);
+        $this->app->singleton(\Modules\MCH\Classes\Services\MchConsentGate::class);
     }
 
     /**

@@ -52,6 +52,11 @@ class ChildHealthRecord extends BaseModel implements ProvidesClientIdentity
         return $this->belongsTo(Patient::class);
     }
 
+    public function deliveryRecord(): BelongsTo
+    {
+        return $this->belongsTo(DeliveryRecord::class);
+    }
+
     public function pregnancyEpisode(): BelongsTo
     {
         return $this->belongsTo(PregnancyEpisode::class);

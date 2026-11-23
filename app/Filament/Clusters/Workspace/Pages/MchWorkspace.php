@@ -27,11 +27,14 @@ use Modules\Core\Settings\FeatureSettings;
 use Modules\Core\Support\OptionalClass;
 use Modules\MCH\Classes\Services\AncReturnScheduler;
 use Modules\MCH\Classes\Services\ChildVisitAssessmentService;
+use Modules\MCH\Classes\Services\DeliveryRecordService;
 use Modules\MCH\Classes\Services\EpiDueService;
 use Modules\MCH\Classes\Services\ImmunizationRecordService;
 use Modules\MCH\Classes\Services\MaternalVisitAssessmentService;
 use Modules\MCH\Classes\Services\MchBookIssuanceService;
+use Modules\MCH\Classes\Services\MchConsentGate;
 use Modules\MCH\Classes\Services\MchWorkspaceService;
+use Modules\MCH\Classes\Services\PostnatalVisitAssessmentService;
 use Modules\MCH\Enums\GrowthMeasurementType;
 use Modules\MCH\Enums\PregnancyOutcome;
 use Modules\MCH\Filament\Clusters\MCH\Pages\VaccinationCard;
@@ -39,15 +42,20 @@ use Modules\MCH\Filament\Clusters\MCH\Resources\ChildVisitAssessments\Schemas\Ch
 use Modules\MCH\Filament\Clusters\MCH\Resources\MaternalVisitAssessments\Schemas\MaternalVisitAssessmentForm;
 use Modules\MCH\Filament\Clusters\MCH\Resources\PregnancyEpisodes\Schemas\PregnancyEpisodeForm;
 use Modules\MCH\Filament\Clusters\Workspace\MchWorkspaceCluster;
+use Modules\MCH\Filament\Schemas\DeliveryRecordForm;
+use Modules\MCH\Filament\Schemas\PostnatalVisitAssessmentForm;
 use Modules\MCH\Filament\Widgets\PatientChildVisitsWidget;
 use Modules\MCH\Filament\Widgets\PatientGrowthMeasurementsWidget;
 use Modules\MCH\Filament\Widgets\PatientImmunizationsWidget;
 use Modules\MCH\Filament\Widgets\PatientMaternalVisitsWidget;
+use Modules\MCH\Filament\Widgets\PatientPostnatalVisitsWidget;
 use Modules\MCH\Models\ChildHealthRecord;
+use Modules\MCH\Models\DeliveryRecord;
 use Modules\MCH\Models\GrowthMeasurement;
 use Modules\MCH\Models\ImmunizationRecord;
 use Modules\MCH\Models\ImmunizationSchedule;
 use Modules\MCH\Models\MaternalVisitAssessment;
+use Modules\MCH\Models\MchRecord;
 use Modules\MCH\Models\PregnancyEpisode;
 use Modules\Patient\Classes\Services\PatientSearchService;
 use Modules\Patient\Classes\Services\PatientService;
@@ -253,7 +261,7 @@ class MchWorkspace extends Page
         $this->patientId = null;
         $this->mode = 'home';
         $this->activeTab = 'overview';
-        $this->context = ['kind' => 'unknown', 'pregnancy' => null, 'childHealthRecord' => null];
+        $this->context = ['kind' => 'unknown', 'pregnancy' => null, 'childHealthRecord' => null, 'delivery' => null];
         $this->currentEncounter = null;
         $this->recacheHeaderActions();
     }
@@ -342,7 +350,11 @@ class MchWorkspace extends Page
                 ->ensureEncounter($this->currentPatient, $this->encounterTypeForContext());
 
             Notification::make()->title('Encounter ready')->success()->send();
-            $this->activeTab = $this->context['kind'] === 'mother' ? 'anc-visit' : 'cwc-visit';
+            $this->activeTab = match ($this->context['kind']) {
+                'mother' => 'anc-visit',
+                'postnatal' => 'pnc-visit',
+                default => 'cwc-visit',
+            };
         } catch (Throwable $e) {
             Notification::make()->title('Could not start visit')->body($e->getMessage())->danger()->send();
         }
@@ -441,7 +453,7 @@ class MchWorkspace extends Page
             return;
         }
 
-        $isMother = $this->context['kind'] === 'mother';
+        $isMother = in_array($this->context['kind'], ['mother', 'postnatal'], true);
         $schedule = ImmunizationSchedule::activeFor(
             $isMother ? ImmunizationSchedule::TARGET_MATERNAL : ImmunizationSchedule::TARGET_CHILD,
         );
@@ -542,7 +554,7 @@ class MchWorkspace extends Page
                 Select::make('outcome')
                     ->options($options)
                     ->required()
-                    ->helperText('Closes the active pregnancy episode. Delivery details are recorded separately.'),
+                    ->helperText('Closes the pregnancy without a delivery (referral, loss to follow-up, death). For a birth use Record delivery.'),
             ])
             ->action(fn (array $data) => $this->recordOutcome((string) $data['outcome']));
     }
@@ -569,6 +581,142 @@ class MchWorkspace extends Page
         $this->selectPatient($this->currentPatient->id);
     }
 
+    public function recordDeliveryAction(): Action
+    {
+        return Action::make('recordDelivery')
+            ->label(__('Record delivery'))
+            ->icon('heroicon-o-heart')
+            ->color('success')
+            ->visible(fn (): bool => $this->context['kind'] === 'mother')
+            ->modalWidth('5xl')
+            ->modalDescription(__('Closes the pregnancy, registers each live-born baby as a patient with a CWC record, saves birth measurements and generates the birth EPI doses.'))
+            ->schema(DeliveryRecordForm::fields())
+            ->action(fn (array $data) => $this->recordDelivery($data));
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function recordDelivery(array $data): void
+    {
+        $episode = $this->context['pregnancy'] ?? null;
+
+        if ($this->currentPatient === null || ! $episode instanceof PregnancyEpisode) {
+            return;
+        }
+
+        try {
+            $delivery = app(DeliveryRecordService::class)->record($episode->fresh(), $data, Auth::id());
+        } catch (Throwable $e) {
+            Notification::make()->title(__('Delivery not recorded'))->body($e->getMessage())->danger()->send();
+
+            return;
+        }
+
+        $registered = $delivery->newborns->whereNotNull('child_patient_id')->count();
+
+        Notification::make()
+            ->title(__('Delivery recorded'))
+            ->body(trans_choice(':count baby registered as a patient.|:count babies registered as patients.', $registered, ['count' => $registered]))
+            ->success()
+            ->send();
+        $this->selectPatient($this->currentPatient->id);
+    }
+
+    public function recordPostnatalVisitAction(): Action
+    {
+        return Action::make('recordPostnatalVisit')
+            ->label(fn (): string => $this->context['kind'] === 'child' ? __('Record newborn check') : __('Record postnatal visit'))
+            ->icon('heroicon-o-clipboard-document-check')
+            ->visible(fn (): bool => $this->context['kind'] === 'postnatal' || $this->isNeonateFromDelivery())
+            ->modalWidth('4xl')
+            ->schema(fn (): array => PostnatalVisitAssessmentForm::fields($this->context['kind'] === 'child' ? 'baby' : 'mother'))
+            ->action(fn (array $data) => $this->recordPostnatalVisit($data));
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function recordPostnatalVisit(array $data): void
+    {
+        if ($this->currentPatient === null) {
+            return;
+        }
+
+        try {
+            $encounter = app(MchWorkspaceService::class)->ensureEncounter($this->currentPatient, EncounterType::POSTNATAL);
+            $this->currentEncounter = $encounter;
+
+            app(PostnatalVisitAssessmentService::class)->record($encounter, [
+                ...$data,
+                'subject' => $this->context['kind'] === 'child' ? 'baby' : 'mother',
+                'delivery_record_id' => $this->context['delivery']?->id ?? null,
+                'recorded_by' => Auth::id(),
+            ]);
+        } catch (Throwable $e) {
+            Notification::make()->title(__('Postnatal visit not saved'))->body($e->getMessage())->danger()->send();
+
+            return;
+        }
+
+        Notification::make()->title(__('Postnatal visit saved'))->success()->send();
+        $this->dispatch('mch-patient-data-updated');
+    }
+
+    /**
+     * The patient's MCH book that lacks data-sharing consent, if any.
+     */
+    public function bookAwaitingConsent(): ?MchRecord
+    {
+        $owner = match ($this->context['kind']) {
+            'mother', 'postnatal' => $this->context['pregnancy'] ?? null,
+            'child' => $this->context['childHealthRecord'] ?? null,
+            default => null,
+        };
+
+        if ($owner === null || $this->currentPatient === null) {
+            return null;
+        }
+
+        if (app(MchConsentGate::class)->hasConsent($this->currentPatient->id)) {
+            return null;
+        }
+
+        return MchRecord::query()
+            ->where('owner_type', $owner::class)
+            ->where('owner_id', $owner->getKey())
+            ->latest('issue_date')
+            ->first();
+    }
+
+    public function recordConsentAction(): Action
+    {
+        return Action::make('recordConsent')
+            ->label(__('Record consent'))
+            ->icon('heroicon-o-check-badge')
+            ->color('warning')
+            ->requiresConfirmation()
+            ->modalDescription(__('Confirm the client agreed to share their MCH data for reporting and data exchange (FHIR, API). Care is never blocked without consent.'))
+            ->visible(fn (): bool => $this->bookAwaitingConsent() !== null)
+            ->action(function (): void {
+                $book = $this->bookAwaitingConsent();
+
+                if ($book !== null) {
+                    app(MchConsentGate::class)->recordConsent($book, Auth::id());
+                    Notification::make()->title(__('Consent recorded'))->success()->send();
+                }
+            });
+    }
+
+    public function isNeonateFromDelivery(): bool
+    {
+        $delivery = $this->context['delivery'] ?? null;
+
+        return $this->context['kind'] === 'child'
+            && $delivery instanceof DeliveryRecord
+            && $delivery->delivered_at->gte(now()->subDays(MchWorkspaceService::POSTNATAL_DAYS));
+    }
+
     public function issueBookAction(): Action
     {
         $unit = $this->bookUnitForContext();
@@ -592,7 +740,7 @@ class MchWorkspace extends Page
             return;
         }
 
-        $owner = $this->context['kind'] === 'mother'
+        $owner = in_array($this->context['kind'], ['mother', 'postnatal'], true)
             ? $this->context['pregnancy']
             : $this->context['childHealthRecord'];
 
@@ -629,7 +777,10 @@ class MchWorkspace extends Page
     {
         return match ($this->context['kind']) {
             'mother' => ['overview', 'encounter', 'anc-visit', 'immunizations', 'vitals', 'books', 'history'],
-            'child' => ['overview', 'encounter', 'cwc-visit', 'immunizations', 'growth', 'vitals', 'books', 'history'],
+            'postnatal' => ['overview', 'encounter', 'pnc-visit', 'immunizations', 'vitals', 'books', 'history'],
+            'child' => $this->isNeonateFromDelivery()
+                ? ['overview', 'encounter', 'cwc-visit', 'pnc-visit', 'immunizations', 'growth', 'vitals', 'books', 'history']
+                : ['overview', 'encounter', 'cwc-visit', 'immunizations', 'growth', 'vitals', 'books', 'history'],
             default => ['overview'],
         };
     }
@@ -844,8 +995,14 @@ class MchWorkspace extends Page
                     PatientMaternalVisitsWidget::make(['patientId' => $patientId]),
                     PatientImmunizationsWidget::make(['patientId' => $patientId]),
                 ],
+                'postnatal' => [
+                    PatientPostnatalVisitsWidget::make(['patientId' => $patientId]),
+                    PatientMaternalVisitsWidget::make(['patientId' => $patientId]),
+                    PatientImmunizationsWidget::make(['patientId' => $patientId]),
+                ],
                 'child' => [
                     PatientChildVisitsWidget::make(['patientId' => $patientId]),
+                    ...($this->isNeonateFromDelivery() ? [PatientPostnatalVisitsWidget::make(['patientId' => $patientId])] : []),
                     PatientImmunizationsWidget::make(['patientId' => $patientId]),
                     PatientGrowthMeasurementsWidget::make(['patientId' => $patientId]),
                 ],
@@ -897,15 +1054,17 @@ class MchWorkspace extends Page
 
     private function encounterTypeForContext(): EncounterType
     {
-        return $this->context['kind'] === 'mother'
-            ? EncounterType::ANTENATAL
-            : EncounterType::CHILD_WELFARE;
+        return match ($this->context['kind']) {
+            'mother' => EncounterType::ANTENATAL,
+            'postnatal' => EncounterType::POSTNATAL,
+            default => EncounterType::CHILD_WELFARE,
+        };
     }
 
     private function bookUnitForContext(): ?string
     {
         return match ($this->context['kind']) {
-            'mother' => 'ANC',
+            'mother', 'postnatal' => 'ANC',
             'child' => 'CWC',
             default => null,
         };

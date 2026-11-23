@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use LogicException;
 use Modules\FHIR\Contracts\FhirResourceContract;
+use Modules\MCH\Classes\Services\MchConsentGate;
 use Modules\MCH\Enums\ImmunizationStatus;
 use Modules\MCH\Models\ImmunizationRecord;
 
@@ -56,9 +57,13 @@ class FhirImmunizationTransformer implements FhirResourceContract
         throw new LogicException('FHIR Immunization import is not yet implemented.');
     }
 
+    /**
+     * Records of patients without MCH data-sharing consent are not exposed
+     * (see MchConsentGate); read, search and $export all go through here.
+     */
     public function findById(string $id): ?Model
     {
-        return ImmunizationRecord::find($id);
+        return $this->query()->whereKey($id)->first();
     }
 
     /**
@@ -68,7 +73,7 @@ class FhirImmunizationTransformer implements FhirResourceContract
      */
     public function query(): Builder
     {
-        return ImmunizationRecord::query()->with(['vaccine']);
+        return app(MchConsentGate::class)->scopeToConsented(ImmunizationRecord::query()->with(['vaccine']));
     }
 
     public function searchableParameters(): array

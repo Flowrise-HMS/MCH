@@ -64,6 +64,11 @@ class MchModuleConventionTest extends TestCase
             DevelopmentalScreen::class,
             VaccineAntigen::class,
             ImmunizationStatus::class,
+            \Modules\MCH\Enums\DeliveryMode::class,
+            \Modules\MCH\Enums\DeliveryPlace::class,
+            \Modules\MCH\Enums\BirthOutcome::class,
+            \Modules\MCH\Enums\PostnatalContact::class,
+            \Modules\MCH\Enums\GrowthIndicator::class,
         ];
     }
 

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use Modules\FHIR\Contracts\FhirResourceContract;
+use Modules\MCH\Classes\Services\MchConsentGate;
 use Modules\MCH\Enums\PregnancyOutcome;
 use Modules\MCH\Models\PregnancyEpisode;
 
@@ -54,14 +55,18 @@ class FhirEpisodeOfCareTransformer implements FhirResourceContract
         ];
     }
 
+    /**
+     * Records of patients without MCH data-sharing consent are not exposed
+     * (see MchConsentGate); read, search and $export all go through here.
+     */
     public function findById(string $id): ?Model
     {
-        return PregnancyEpisode::find($id);
+        return $this->query()->whereKey($id)->first();
     }
 
     public function query(): Builder
     {
-        return PregnancyEpisode::query();
+        return app(MchConsentGate::class)->scopeToConsented(PregnancyEpisode::query());
     }
 
     public function searchableParameters(): array

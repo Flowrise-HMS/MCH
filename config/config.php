@@ -5,6 +5,14 @@ return [
 
     'book_units' => ['ANC', 'CWC'],
 
+    /*
+     | Data-sharing consent (mch_records.data_consented) gates FHIR, API and AI
+     | assistant access to MCH data; care workflows are never blocked.
+     */
+    'consent' => [
+        'enforce' => (bool) env('MCH_ENFORCE_CONSENT', true),
+    ],
+
     'anc_returns' => [
         'timezone' => env('MCH_ANC_RETURN_TIMEZONE', env('APP_TIMEZONE', 'Africa/Accra')),
         'frequency' => 'weekly',
