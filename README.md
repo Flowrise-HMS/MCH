@@ -4,7 +4,7 @@
 
 The `MCH` module depends on `Modules\Core`, `Modules\Patient`, and `Modules\Clinical`. Appointment is an optional peer: ANC return dates (`AncReturnScheduler`) and EPI dose appointments (`EpiAppointmentScheduler`) are booked only when the Appointment module is enabled.
 
-Verified against code on 2026-09-20.
+Verified against code on 2026-11-24.
 
 This document is the canonical guide for the module. It is meant to be useful to:
 
@@ -28,12 +28,12 @@ What is available:
 - client-held MCH book issuance and replacement with per-branch serials (`ANC-0001`, `CWC-0001`, ...)
 - **MCH Workspace** (Workspaces sidebar group): search or register mother/child, home dashboard (ANC today, CWC today, EPI due/overdue, EDD within 14 days, high-risk pregnancies, books issued today, recent), and per-patient tabs
 - FHIR `EpisodeOfCare` (read/search) and `Immunization` (read) mappings
-- a Filament **MCH** cluster in the **Patient Care** sidebar group with nine resources, plus read-only relation managers on the patient record
+- a Filament **MCH** cluster in the **Patient Care** sidebar group with eleven resources, plus read-only relation managers on the patient record
 - Shield policies for every resource model, seeded by `MchShieldPermissionsSeeder` (super_admin, doctor, nurse)
 - **WHO growth Z-scores (MCH-3)**: every child weight, length/height, head circumference and MUAC (0–5 years) gets its WHO Child Growth Standards Z-score (WAZ, HAZ, HCZ, ACZ) and weights get weight-for-length/height (WHZ) when a length was taken the same day; classification badges (stunted, wasted, underweight, overweight, …) and a growth chart against the −3/−2/0/+2/+3 SD curves on the workspace Growth tab
 - **Delivery and newborns (MCH-4)**: "Record delivery" closes the pregnancy (delivered / stillbirth / maternal death), stores the delivery (time, place, mode, attendant, gestation, blood loss, complications) and one row per baby (sex, outcome, birth weight, length, head circumference, APGAR); every live-born baby is registered as a patient (*Baby &lt;surname&gt;*, *Baby A/B* for multiples) with a CWC record linked to the delivery, a mother relationship, birth measurements (with Z-scores) and the birth EPI doses
 - **Postnatal care (MCH-4)**: for 49 days after delivery the mother opens in a *postnatal* context with a PNC tab; newborns from a recorded delivery get a newborn-check (PNC) tab; WHO contacts (within 24 h, day 3, days 7–14, week 6) are derived from the days since delivery
-- **Consent enforcement**: `mch_records.data_consented` gates FHIR read/search/`$export` of MCH data (and the MCH API endpoints once added) via `MchConsentGate`; clinicians are never blocked; the workspace shows a "consent not recorded" banner with **Record consent**; `mch_override_consent` bypasses the gate and `MCH_ENFORCE_CONSENT=false` disables it
+- **Consent enforcement**: `mch_records.data_consented` gates FHIR read/search/`$export` of MCH data and of the MCH API endpoints via `MchConsentGate`; clinicians are never blocked; the workspace shows a "consent not recorded" banner with **Record consent**; `mch_override_consent` (created by the seeder, granted to nobody; super admins pass every check) bypasses the gate; a newborn is not covered by its mother's consent; and `MCH_ENFORCE_CONSENT=false` disables it
 
 ## Mental Model
 
@@ -82,7 +82,7 @@ All models extend `Modules\Core\Models\BaseModel` (auditing + `BelongsToBranch`)
 | `mch_newborns` | One row per baby of a delivery; `child_patient_id` for live births | no |
 | `mch_postnatal_visit_assessments` | PNC checks (mother or baby) on a postnatal encounter | no |
 
-`growth_measurements` also carries `z_score`, `z_indicator` (`wfa`/`lhfa`/`hcfa`/`acfa`) and `whz`. WHO LMS reference tables live in `database/data/who/` (see its README for source and licence). 13 migrations, 12 factories.
+`growth_measurements` also carries `z_score`, `z_indicator` (`wfa`/`lhfa`/`hcfa`/`acfa`) and `whz`. WHO LMS reference tables live in `database/data/who/` (see its README for source and terms). 13 migrations, 12 factories.
 
 ### Enums
 
@@ -249,7 +249,6 @@ php artisan test --compact Modules/MCH/tests
 
 ## Related Documentation
 
-- `docs/superpowers/plans/2026-08-15-mch-1-registry-and-visits.md`, `2026-08-18-mch-2-immunization-epi.md`, `2026-08-21-mch-workspace.md`
 - `docs/AGENT_KNOWLEDGE_BASE.md`
 - `docs/shared/module-status.md`
 
