@@ -75,7 +75,7 @@ class GrowthMeasurement extends BaseModel implements ProvidesClientIdentity
 
     public function indicator(): ?GrowthIndicator
     {
-        return GrowthIndicator::tryFrom((string) $this->z_indicator);
+        return enum_try_from(GrowthIndicator::class, (string) $this->z_indicator);
     }
 
     public function patient(): BelongsTo

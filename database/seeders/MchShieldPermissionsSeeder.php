@@ -3,6 +3,7 @@
 namespace Modules\MCH\Database\Seeders;
 
 use Illuminate\Database\Seeder;
+use Modules\MCH\Classes\Services\MchConsentGate;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
@@ -22,6 +23,8 @@ class MchShieldPermissionsSeeder extends Seeder
         'ChildVisitAssessment',
         'GrowthMeasurement',
         'MchRecord',
+        'DeliveryRecord',
+        'PostnatalVisitAssessment',
     ];
 
     /**
@@ -66,6 +69,10 @@ class MchShieldPermissionsSeeder extends Seeder
 
             $role->givePermissionTo($names);
         }
+
+        // Created but granted to nobody: overriding data-sharing consent is an
+        // explicit decision for each deployment.
+        Permission::findOrCreate(MchConsentGate::OVERRIDE_PERMISSION, 'web');
 
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
     }

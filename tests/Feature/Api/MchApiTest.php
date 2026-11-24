@@ -180,5 +180,7 @@ describe('mch workflow', function () use ($modules): void {
         $this->postJson("/api/v1/immunizations/{$dose->id}/administer", ['batch_lot' => 'LOT1'])
             ->assertOk()
             ->assertJsonPath('data.status', ImmunizationStatus::ADMINISTERED->value);
+        $this->postJson("/api/v1/immunizations/{$dose->id}/administer")->assertUnprocessable();
+        $this->postJson("/api/v1/immunizations/{$dose->id}/decline", ['reason' => 'Late refusal'])->assertUnprocessable();
     });
 });

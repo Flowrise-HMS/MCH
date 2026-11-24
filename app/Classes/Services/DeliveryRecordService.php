@@ -81,7 +81,7 @@ class DeliveryRecordService
             $anyLive = false;
 
             foreach ($babies as $index => $baby) {
-                $outcome = $baby['outcome'] instanceof BirthOutcome ? $baby['outcome'] : BirthOutcome::from((string) $baby['outcome']);
+                $outcome = $baby['outcome'] instanceof BirthOutcome ? $baby['outcome'] : enum_from(BirthOutcome::class, (string) $baby['outcome']);
                 $sex = $baby['sex'] instanceof Gender ? $baby['sex'] : Gender::from((string) $baby['sex']);
 
                 $newborn = Newborn::create([

@@ -3,6 +3,10 @@
 return [
     'name' => 'MCH',
 
+    'permissions' => [
+        'mch_override_consent' => 'Override MCH Data Sharing Consent',
+    ],
+
     'book_units' => ['ANC', 'CWC'],
 
     /*

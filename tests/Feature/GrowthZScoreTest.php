@@ -83,6 +83,16 @@ class GrowthZScoreTest extends TestCase
         $this->assertEqualsWithDelta(2.0, $this->service->zScore(GrowthIndicator::HEAD_CIRCUMFERENCE_FOR_AGE, 2, 0, 36.247), 0.01);
     }
 
+    public function test_age_tables_cover_the_whole_five_year_range(): void
+    {
+        // WHO expanded tables, day 1856 (the last row): boys weight median 18.4968 kg,
+        // girls height median 109.9352 cm.
+        $this->assertEqualsWithDelta(0.0, $this->service->zScore(GrowthIndicator::WEIGHT_FOR_AGE, 1, 1856, 18.4968), 0.001);
+        $this->assertEqualsWithDelta(0.0, $this->service->zScore(GrowthIndicator::LENGTH_FOR_AGE, 2, 1856, 109.9352), 0.001);
+        $this->assertNotNull($this->service->zScore(GrowthIndicator::HEAD_CIRCUMFERENCE_FOR_AGE, 1, 1840, 50));
+        $this->assertNotNull($this->service->zScore(GrowthIndicator::WEIGHT_FOR_AGE, 2, 1827, 18));
+    }
+
     public function test_out_of_range_inputs_return_null(): void
     {
         $this->assertNull($this->service->zScore(GrowthIndicator::WEIGHT_FOR_AGE, 1, 1900, 15));

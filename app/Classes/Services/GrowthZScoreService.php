@@ -61,7 +61,7 @@ class GrowthZScoreService
         $measurement->z_score = null;
         $measurement->z_indicator = null;
 
-        $type = $measurement->type instanceof GrowthMeasurementType ? $measurement->type : GrowthMeasurementType::tryFrom((string) $measurement->type);
+        $type = $measurement->type instanceof GrowthMeasurementType ? $measurement->type : enum_try_from(GrowthMeasurementType::class, (string) $measurement->type);
         $indicator = $type !== null ? GrowthIndicator::forMeasurement($type) : null;
         [$sex, $ageDays] = $this->childContext($measurement);
 
@@ -115,7 +115,7 @@ class GrowthZScoreService
      */
     public static function classify(GrowthIndicator|string|null $indicator, ?float $z): ?array
     {
-        $indicator = is_string($indicator) ? GrowthIndicator::tryFrom($indicator) : $indicator;
+        $indicator = is_string($indicator) ? enum_try_from(GrowthIndicator::class, $indicator) : $indicator;
 
         if ($indicator === null || $z === null) {
             return null;

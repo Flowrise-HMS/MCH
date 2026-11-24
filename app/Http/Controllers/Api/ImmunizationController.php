@@ -2,9 +2,11 @@
 
 namespace Modules\MCH\Http\Controllers\Api;
 
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\MCH\Classes\Services\ImmunizationRecordService;
+use Modules\MCH\Enums\ImmunizationStatus;
 use Modules\MCH\Models\ImmunizationRecord;
 
 /**
@@ -62,7 +64,17 @@ class ImmunizationController extends MchApiController
             'medication_id' => ['nullable', 'uuid'],
         ]);
 
-        return $this->act($id, 'update', fn (ImmunizationRecord $record) => $this->immunizations->administer($record, $data));
+        return $this->act($id, 'update', function (ImmunizationRecord $record) use ($data): ImmunizationRecord {
+            $this->requireStatus($record, [ImmunizationStatus::SCHEDULED, ImmunizationStatus::DECLINED], 'Only scheduled or declined doses can be administered.');
+
+            try {
+                return $this->immunizations->administer($record, $data);
+            } catch (QueryException $e) {
+                throw $e;
+            } catch (\RuntimeException $e) {
+                throw new \DomainException($e->getMessage(), 0, $e);
+            }
+        });
     }
 
     /**
@@ -74,6 +86,10 @@ class ImmunizationController extends MchApiController
     {
         $data = $request->validate(['reason' => ['required', 'string', 'max:500']]);
 
-        return $this->act($id, 'update', fn (ImmunizationRecord $record) => $this->immunizations->decline($record, $data));
+        return $this->act($id, 'update', function (ImmunizationRecord $record) use ($data): ImmunizationRecord {
+            $this->requireStatus($record, [ImmunizationStatus::SCHEDULED], 'Only scheduled doses can be declined.');
+
+            return $this->immunizations->decline($record, $data);
+        });
     }
 }

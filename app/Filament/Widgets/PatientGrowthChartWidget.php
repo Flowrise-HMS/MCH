@@ -55,7 +55,7 @@ class PatientGrowthChartWidget extends ChartWidget
 
     protected function getData(): array
     {
-        return static::chartData($this->patientId, GrowthIndicator::tryFrom((string) $this->filter) ?? GrowthIndicator::WEIGHT_FOR_AGE);
+        return static::chartData($this->patientId, enum_try_from(GrowthIndicator::class, (string) $this->filter) ?? GrowthIndicator::WEIGHT_FOR_AGE);
     }
 
     /**
